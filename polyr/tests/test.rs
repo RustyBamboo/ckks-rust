@@ -91,3 +91,17 @@ fn overflow_mul() {
 
     assert_eq!(polynomial_ring!(q, n, (7, 1, 7)), c);
 }
+
+#[allow(unused_variables)]
+#[test]
+fn rand() {
+    let n = 4;
+    let q = 13;
+
+    let a = PolynomialRing::rand_binary(q, n, 4);
+    let b = PolynomialRing::rand_uniform(q, n, 4);
+    let c = PolynomialRing::rand_normal(q, n, 4);
+    println!("{}", a);
+    println!("{}", b);
+    println!("{}", c);
+}

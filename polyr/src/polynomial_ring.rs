@@ -1,4 +1,6 @@
 use itertools::{iproduct, EitherOrBoth::*, Itertools};
+use rand::distributions::{Distribution, Uniform};
+use rand_distr::Normal;
 
 #[derive(PartialEq, Debug)]
 pub struct PolynomialRing<T> {
@@ -29,6 +31,23 @@ impl PolynomialRing<i32> {
         self.len() == 0
     }
 
+    // Remove trailing zeros
+    pub fn clean(mut self) -> Self {
+        let mut count = 0;
+        {
+            let coef = self.coef.iter().rev();
+            for c in coef {
+                if *c == 0 {
+                    count += 1;
+                } else {
+                    break;
+                }
+            }
+        }
+        self.coef.drain(self.coef.len() - count..);
+        self
+    }
+
     // Take the function modulo of self with (X^n + 1)
     fn mod_cyc(mut self) -> Self {
         let n = self.pmod;
@@ -45,6 +64,27 @@ impl PolynomialRing<i32> {
 
     pub fn check_same_basis(&self, other: &Self) -> bool {
         self.ring == other.ring && self.pmod == other.pmod
+    }
+
+    pub fn rand_binary(ring: i32, pmod: usize, size: usize) -> Self {
+        let mut rng = rand::thread_rng();
+        let u = Uniform::from(0..2);
+        let coef = (0..size).map(|_| u.sample(&mut rng)).collect();
+        Self { coef, ring, pmod }.clean()
+    }
+
+    pub fn rand_uniform(ring: i32, pmod: usize, size: usize) -> Self {
+        let mut rng = rand::thread_rng();
+        let u = Uniform::from(0..ring);
+        let coef = (0..size).map(|_| u.sample(&mut rng)).collect();
+        Self { coef, ring, pmod }.clean()
+    }
+
+    pub fn rand_normal(ring: i32, pmod: usize, size: usize) -> Self {
+        let mut rng = rand::thread_rng();
+        let n = Normal::new(0., 2.).expect("Error creating distribution");
+        let coef = (0..size).map(|_| n.sample(&mut rng) as i32).collect();
+        Self { coef, ring, pmod }.clean()
     }
 }
 
