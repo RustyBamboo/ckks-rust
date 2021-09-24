@@ -1,4 +1,5 @@
 pub use polyr::{polynomial, Polynomial};
+pub use polyr::{polynomial_ring, PolynomialRing};
 #[test]
 fn mod_cyc() {
     let mut poly = polynomial![0, 77, 7, 11, 12, 1];
@@ -56,17 +57,37 @@ fn rlwe() {
     let n = 2 * 2; // n = 2^k = len(a)
     let q = 13; // q = 1 mod 2n
 
-    let a = polynomial![10, 11, 1, 4];
-    let s = polynomial![11, 11, 9, 6];
-    let e = polynomial![1, 1, -1, 0];
+    let a = polynomial_ring!(q, n, (10, 11, 1, 4));
+    let s = polynomial_ring!(q, n, (11, 11, 9, 6));
+    let e = polynomial_ring!(q, n, (1, 1, -1, 0));
 
-    let mut mul = a * s;
-    mul.rem_euclid(q);
-    mul.mod_cyc(n);
+    let c = a * s + e;
 
-    let mut res = mul + e;
-    res.rem_euclid(q);
-    res.mod_cyc(n);
+    assert_eq!(polynomial_ring!(q, n, (5, 8, 2, 6)), c);
+}
 
-    assert_eq!(polynomial![5, 8, 2, 6], res);
+#[test]
+fn overflow_add() {
+    let n = 4;
+    let q = 13;
+
+    let a = polynomial_ring!(q, n, (i32::MAX, i32::MAX));
+    let b = polynomial_ring!(q, n, (1, 2));
+
+    let c = a + b;
+
+    assert_eq!(polynomial_ring!(q, n, (11, 12)), c);
+}
+
+#[test]
+fn overflow_mul() {
+    let n = 4;
+    let q = 13;
+
+    let a = polynomial_ring!(q, n, (i32::MAX, i32::MAX));
+    let b = polynomial_ring!(q, n, (2, 2));
+
+    let c = a * b;
+
+    assert_eq!(polynomial_ring!(q, n, (7, 1, 7)), c);
 }
