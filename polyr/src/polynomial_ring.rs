@@ -2,7 +2,7 @@ use itertools::{iproduct, EitherOrBoth::*, Itertools};
 use rand::distributions::{Distribution, Uniform};
 use rand_distr::Normal;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct PolynomialRing<T> {
     pub coef: Vec<T>,
     pub ring: T,

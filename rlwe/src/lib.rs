@@ -5,6 +5,25 @@ pub struct PublicKey<T>(pub PolynomialRing<T>, pub PolynomialRing<T>);
 #[derive(Debug)]
 pub struct CipherText<T>(PolynomialRing<T>, PolynomialRing<T>);
 
+impl std::ops::Add for &CipherText<i32> {
+    type Output = CipherText<i32>;
+    fn add(self, other: &CipherText<i32>) -> CipherText<i32> {
+        CipherText {
+            0: &self.0 + &other.0,
+            1: &self.1 + &other.1,
+        }
+    }
+}
+impl std::ops::Mul for &CipherText<i32> {
+    type Output = CipherText<i32>;
+    fn mul(self, other: &CipherText<i32>) -> CipherText<i32> {
+        CipherText {
+            0: &self.0 * &other.0,
+            1: &self.1 * &other.1,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Rwle<T> {
     sk: PolynomialRing<T>,
@@ -57,7 +76,7 @@ pub fn encrypt(
     ring: i32,
     t: i32,
     pmod: usize,
-    data: Vec<i32>,
+    data: &Vec<i32>,
 ) -> CipherText<i32> {
     let delta = ring / t;
     let data = data.iter().map(|x| (x * delta).rem_euclid(ring)).collect();
