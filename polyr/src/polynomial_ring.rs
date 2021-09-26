@@ -4,9 +4,9 @@ use rand_distr::Normal;
 
 #[derive(PartialEq, Debug)]
 pub struct PolynomialRing<T> {
-    coef: Vec<T>,
-    ring: T,
-    pmod: usize,
+    pub coef: Vec<T>,
+    pub ring: T,
+    pub pmod: usize,
 }
 
 #[macro_export]
@@ -19,7 +19,7 @@ macro_rules! polynomial_ring {
 impl PolynomialRing<i32> {
     pub fn new(ring: i32, pmod: usize, coef: Vec<i32>) -> Self {
         // Take the mod to make sure elements are in the ring
-        let coef = coef.iter().map(|x| x.rem_euclid(ring)).collect();
+        let coef = coef.iter().map(|x| x % ring).collect();
         Self { coef, ring, pmod }
     }
 
@@ -106,12 +106,62 @@ impl std::ops::Add for PolynomialRing<i32> {
     }
 }
 
+impl std::ops::Add<&PolynomialRing<i32>> for &PolynomialRing<i32> {
+    type Output = PolynomialRing<i32>;
+    fn add(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
+        assert!(self.check_same_basis(other));
+        let out = other
+            .coef
+            .iter()
+            .zip_longest(self.coef.iter())
+            .map(|x| match x {
+                Both(a, b) => (a + b).rem_euclid(self.ring),
+                Left(a) => *a,
+                Right(a) => *a,
+            })
+            .collect();
+        PolynomialRing::new(self.ring, self.pmod, out).mod_cyc()
+    }
+}
+
+impl std::ops::Add<&PolynomialRing<i32>> for PolynomialRing<i32> {
+    type Output = PolynomialRing<i32>;
+    fn add(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
+        assert!(self.check_same_basis(other));
+        let out = other
+            .coef
+            .iter()
+            .zip_longest(self.coef.iter())
+            .map(|x| match x {
+                Both(a, b) => (a + b).rem_euclid(self.ring),
+                Left(a) => *a,
+                Right(a) => *a,
+            })
+            .collect();
+        PolynomialRing::new(self.ring, self.pmod, out).mod_cyc()
+    }
+}
+
 // TODO: Use FFT to do this in O(nlogn) instead of O(n^2)
 //
 // See; https://math.stackexchange.com/questions/764727/concrete-fft-polynomial-multiplication-example
 impl std::ops::Mul for PolynomialRing<i32> {
     type Output = Self;
     fn mul(self, other: PolynomialRing<i32>) -> Self {
+        assert!(self.check_same_basis(&other));
+        let mut res = vec![0; other.len() + self.len() - 1];
+        for ((i1, v1), (i2, v2)) in
+            iproduct!(other.coef.iter().enumerate(), self.coef.iter().enumerate())
+        {
+            res[i1 + i2] += (v1 * v2).rem_euclid(self.ring);
+        }
+        PolynomialRing::new(self.ring, self.pmod, res).mod_cyc()
+    }
+}
+
+impl std::ops::Mul<&PolynomialRing<i32>> for &PolynomialRing<i32> {
+    type Output = PolynomialRing<i32>;
+    fn mul(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
         assert!(self.check_same_basis(&other));
         let mut res = vec![0; other.len() + self.len() - 1];
         for ((i1, v1), (i2, v2)) in

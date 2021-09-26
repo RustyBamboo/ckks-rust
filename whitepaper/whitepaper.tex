@@ -1,0 +1,51 @@
+\documentclass{article}
+    % General document formatting
+    \usepackage[margin=0.7in]{geometry}
+    \usepackage[parfill]{parskip}
+    \usepackage[utf8]{inputenc}
+    
+    % Related to math
+    \usepackage{amsmath,amssymb,amsfonts,amsthm}
+
+\title{Decentralized Compute Marketplace}
+\author{Quphase}
+\date{}
+
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+We don't aim to compete with AWS, we aim to create a marketplace for services like AWS.
+
+
+\section{Math}
+\subsection{Polynomial Ring $K[x]$}
+
+We call a polynomial in $x$ over a field $K$ as $K[x]$ and define it as:
+
+$$p = p_0 + p_1 x + p_2 x^2 + \hdots + p_m x^m$$
+
+where $p_i \in K $ are the coefficients of polynomial $p$. And, as we dealt with in elementary school, we can add and multiply two polynomials together. For polynomials $p$ and $q$, we have addition $p+q$ and multiplication $p \times q$. The results of these operations leads to another polynomial.
+
+A specific example of a polynomial are ones over the integers: 
+
+$$\mathbb{R}[x]$$
+
+Or over integers modulus $q$:
+
+$$\mathbb{R}_q[x]$$
+
+
+
+\subsection{Quotient Rings of Polynomial Rings}
+One problem from the definition of polynomials, is that when we multiply two polynomials, we get a degree of a polynomial that is larger than the ones we started with. To solve this, we can work under a polynomial modulus. A specific example are polynomials of the following form:
+
+$$\mathbb{Z}_q[x] / (x^n + 1)$$
+
+Now addition and multiplication over the polynomials are done \texttt{mod} $x^n + 1$ (i.e. divide the result by $x^n + 1$ and take the remainder). The insures that all of our polynomials have degree $d < n$
+
+
+
+\end{document}

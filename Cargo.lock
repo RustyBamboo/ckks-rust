@@ -130,6 +130,9 @@ dependencies = [
 [[package]]
 name = "rlwe"
 version = "0.1.0"
+dependencies = [
+ "polyr",
+]
 
 [[package]]
 name = "wasi"
