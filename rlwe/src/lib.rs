@@ -1,7 +1,9 @@
 use polyr::{polynomial_ring, PolynomialRing};
 
+// b & a from equation a * s + e = b where a,s,e are randomly generated 
 #[derive(Debug)]
 pub struct PublicKey<T>(pub PolynomialRing<T>, pub PolynomialRing<T>);
+// encrypted data
 #[derive(Debug)]
 pub struct CipherText<T>(PolynomialRing<T>, PolynomialRing<T>);
 
@@ -36,7 +38,7 @@ impl Rwle<i32> {
         // Our secret key
         let sk = PolynomialRing::rand_binary(ring, pmod, size);
 
-        // First part of our public key
+        // First part of our public key, a
         let mut a = PolynomialRing::rand_uniform(ring, pmod, size);
         // Flip the sign in calculation of public key
         a.coef = a.coef.iter().map(|x| -x).collect();
@@ -44,7 +46,7 @@ impl Rwle<i32> {
         // A little bit of noise
         let e = PolynomialRing::rand_normal(ring, pmod, size);
 
-        // Second part of public key
+        // Second part of public key, b
         let b = &a * &sk + &e;
 
         // Return back sign
@@ -85,9 +87,9 @@ pub fn encrypt(
     let e1 = PolynomialRing::rand_normal(ring, pmod, size);
     let e2 = PolynomialRing::rand_normal(ring, pmod, size);
     let u = PolynomialRing::rand_binary(ring, pmod, size);
-
+    // Encrypt the data with b and add error. 
     let ct0 = (&pk.0 * &u) + &e1 + &data;
-
+    // Apply u to pk1 to preserve integrity and add error.
     let ct1 = &pk.1 * &u + &e2;
 
     CipherText(ct0, ct1)
@@ -99,6 +101,8 @@ pub fn decrypt(
     t: i32,
     ct: CipherText<i32>,
 ) -> PolynomialRing<i32> {
+    // ((a) * u) * s) + ((-a * s) * u) + d 
+    // ~b * (~-b + d) = d cause error don't matter if you round!
     let mut plain = &ct.1 * &sk + &ct.0;
     plain.coef = plain
         .coef
