@@ -2,6 +2,24 @@ use itertools::{iproduct, EitherOrBoth::*, Itertools};
 use rand::distributions::{Distribution, Uniform};
 use rand_distr::Normal;
 
+///
+/// Takes a number and maps it into the space (q/2, q/2] for some number q.
+///
+pub fn mod_ring(num: i32, q: i32) -> i32 {
+    let num = num.rem_euclid(q);
+
+    return if num > q / 2 { num - q } else { num };
+}
+
+pub trait Modulo {
+    fn mod_ring(self, q: Self) -> Self;
+}
+impl Modulo for i32 {
+    fn mod_ring(self, q: Self) -> Self {
+        return mod_ring(self, q);
+    }
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct PolynomialRing<T> {
     pub coef: Vec<T>,
@@ -19,7 +37,7 @@ macro_rules! polynomial_ring {
 impl PolynomialRing<i32> {
     pub fn new(ring: i32, pmod: usize, coef: Vec<i32>) -> Self {
         // Take the mod to make sure elements are in the ring
-        let coef = coef.iter().map(|x| x % ring).collect();
+        let coef = coef.iter().map(|x| x.mod_ring(ring)).collect();
         Self { coef, ring, pmod }
     }
 
@@ -97,7 +115,7 @@ impl std::ops::Add for PolynomialRing<i32> {
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
-                Both(a, b) => (a + b).rem_euclid(self.ring),
+                Both(a, b) => (a + b).mod_ring(self.ring),
                 Left(a) => *a,
                 Right(a) => *a,
             })
@@ -115,7 +133,7 @@ impl std::ops::Add<&PolynomialRing<i32>> for &PolynomialRing<i32> {
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
-                Both(a, b) => (a + b).rem_euclid(self.ring),
+                Both(a, b) => (a + b).mod_ring(self.ring),
                 Left(a) => *a,
                 Right(a) => *a,
             })
@@ -133,7 +151,61 @@ impl std::ops::Add<&PolynomialRing<i32>> for PolynomialRing<i32> {
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
-                Both(a, b) => (a + b).rem_euclid(self.ring),
+                Both(a, b) => (a + b).mod_ring(self.ring),
+                Left(a) => *a,
+                Right(a) => *a,
+            })
+            .collect();
+        PolynomialRing::new(self.ring, self.pmod, out).mod_cyc()
+    }
+}
+
+impl std::ops::Sub for PolynomialRing<i32> {
+    type Output = Self;
+    fn sub(self, other: PolynomialRing<i32>) -> Self {
+        assert!(self.check_same_basis(&other));
+        let out = other
+            .coef
+            .iter()
+            .zip_longest(self.coef.iter())
+            .map(|x| match x {
+                Both(a, b) => (b - a).mod_ring(self.ring),
+                Left(a) => *a,
+                Right(a) => *a,
+            })
+            .collect();
+        PolynomialRing::new(self.ring, self.pmod, out).mod_cyc()
+    }
+}
+
+impl std::ops::Sub<&PolynomialRing<i32>> for &PolynomialRing<i32> {
+    type Output = PolynomialRing<i32>;
+    fn sub(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
+        assert!(self.check_same_basis(other));
+        let out = other
+            .coef
+            .iter()
+            .zip_longest(self.coef.iter())
+            .map(|x| match x {
+                Both(a, b) => (b - a).mod_ring(self.ring),
+                Left(a) => *a,
+                Right(a) => *a,
+            })
+            .collect();
+        PolynomialRing::new(self.ring, self.pmod, out).mod_cyc()
+    }
+}
+
+impl std::ops::Sub<&PolynomialRing<i32>> for PolynomialRing<i32> {
+    type Output = PolynomialRing<i32>;
+    fn sub(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
+        assert!(self.check_same_basis(other));
+        let out = other
+            .coef
+            .iter()
+            .zip_longest(self.coef.iter())
+            .map(|x| match x {
+                Both(a, b) => (b - a).mod_ring(self.ring),
                 Left(a) => *a,
                 Right(a) => *a,
             })
@@ -153,7 +225,7 @@ impl std::ops::Mul for PolynomialRing<i32> {
         for ((i1, v1), (i2, v2)) in
             iproduct!(other.coef.iter().enumerate(), self.coef.iter().enumerate())
         {
-            res[i1 + i2] += (v1 * v2).rem_euclid(self.ring);
+            res[i1 + i2] += (v1 * v2).mod_ring(self.ring);
         }
         PolynomialRing::new(self.ring, self.pmod, res).mod_cyc()
     }
@@ -167,7 +239,7 @@ impl std::ops::Mul<&PolynomialRing<i32>> for &PolynomialRing<i32> {
         for ((i1, v1), (i2, v2)) in
             iproduct!(other.coef.iter().enumerate(), self.coef.iter().enumerate())
         {
-            res[i1 + i2] += (v1 * v2).rem_euclid(self.ring);
+            res[i1 + i2] += (v1 * v2).mod_ring(self.ring);
         }
         PolynomialRing::new(self.ring, self.pmod, res).mod_cyc()
     }

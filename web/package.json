@@ -1,0 +1,16 @@
+{
+  "main": "build/index.html",
+  "scripts": {
+    "build:all": "yarn build:pages && yarn compile:css:prod",
+    "build:pages": "rm -rf build && mkdir -p build && cp -r ./src/*.html ./build/",
+    "serve:prod": "yarn build && yarn serve build",
+    "serve:dev": "yarn serve src",
+    "compile:css:prod": "NODE_ENV=production npx tailwindcss build ./src/app.css -o ./build/index.css",
+    "compile:css:dev": "npx tailwindcss build ./src/app.css -o ./src/index.css",
+    "watch": "watch 'yarn compile:css:dev' ./src/"
+  },
+  "dependencies": {
+    "serve": "^12.0.1",
+    "tailwindcss": "^2.2.16"
+  }
+}

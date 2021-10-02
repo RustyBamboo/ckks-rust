@@ -7,6 +7,8 @@ pub struct PublicKey<T>(pub PolynomialRing<T>, pub PolynomialRing<T>);
 #[derive(Debug)]
 pub struct CipherText<T>(PolynomialRing<T>, PolynomialRing<T>);
 
+type PrivateKey<T> = PolynomialRing<T>;
+
 impl std::ops::Add for &CipherText<i32> {
     type Output = CipherText<i32>;
     fn add(self, other: &CipherText<i32>) -> CipherText<i32> {
@@ -16,6 +18,17 @@ impl std::ops::Add for &CipherText<i32> {
         }
     }
 }
+
+impl std::ops::Sub for &CipherText<i32> {
+    type Output = CipherText<i32>;
+    fn sub(self, other: &CipherText<i32>) -> CipherText<i32> {
+        CipherText {
+            0: &self.0 - &other.0,
+            1: &self.1 - &other.1,
+        }
+    }
+}
+
 impl std::ops::Mul for &CipherText<i32> {
     type Output = CipherText<i32>;
     fn mul(self, other: &CipherText<i32>) -> CipherText<i32> {
@@ -28,7 +41,7 @@ impl std::ops::Mul for &CipherText<i32> {
 
 #[derive(Debug)]
 pub struct Rwle<T> {
-    sk: PolynomialRing<T>,
+    sk: PrivateKey<T>,
     public: PublicKey<T>,
     e: PolynomialRing<T>,
 }
@@ -36,7 +49,7 @@ pub struct Rwle<T> {
 impl Rwle<i32> {
     pub fn keygen(ring: i32, pmod: usize, size: usize) -> Self {
         // Our secret key
-        let sk = PolynomialRing::rand_binary(ring, pmod, size);
+        let sk = PrivateKey::rand_binary(ring, pmod, size);
 
         // First part of our public key, a
         let mut a = PolynomialRing::rand_uniform(ring, pmod, size);
@@ -57,6 +70,16 @@ impl Rwle<i32> {
             e,
             public: PublicKey(b, a),
         }
+    }
+
+    pub fn switch_key(&mut self, big_modulo: i32, new_key: &PolynomialRing<i32>) {
+        let modulo = big_modulo * big_modulo;
+
+        let swk = PolynomialRing::rand_uniform(modulo, self.sk.pmod, self.sk.len());
+        let swk_e = PolynomialRing::rand_normal(modulo, self.sk.pmod, self.sk.len());
+        self.sk.ring = modulo;
+
+        let sw0 = &swk * &self.sk;
     }
 
     pub fn public(&self) -> &PublicKey<i32> {

@@ -1,5 +1,7 @@
+pub use polyr::Modulo;
 pub use polyr::{polynomial, Polynomial};
 pub use polyr::{polynomial_ring, PolynomialRing};
+
 #[test]
 fn mod_cyc() {
     let mut poly = polynomial![0, 77, 7, 11, 12, 1];
@@ -21,6 +23,14 @@ fn mul() {
     let b = polynomial![0, 11, 1];
     let c = a * b;
     assert_eq!(polynomial![0, 77, 7, 11, 12, 1], c);
+}
+
+#[test]
+fn sub() {
+    let a = polynomial_ring!(13, 4, (1, 1, 1, 1));
+    let b = polynomial_ring!(13, 4, (0, 0, 0));
+    let c = a - b;
+    assert_eq!(polynomial_ring!(13, 4, (1, 1, 1, 1)), c);
 }
 
 #[test]
@@ -50,6 +60,15 @@ fn mul_field_mod_cyc() {
     c.mod_cyc(4);
     c.rem_euclid(5);
     assert_eq!(polynomial![3, 1, 2, 1], c)
+}
+
+#[test]
+fn test_modulo() {
+    let q = 13;
+
+    let x = [1, 6, 7, 13, 14, 26, 27, -26, -14, -13, -7, -6, -1];
+    let y: Vec<i32> = x.iter().map(|&a| a.mod_ring(q)).collect();
+    assert_eq!(vec![1, 6, -6, 0, 1, 0, 1, 0, -1, 0, 6, -6, -1], y);
 }
 
 #[test]

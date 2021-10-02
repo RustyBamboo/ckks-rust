@@ -1,0 +1,15 @@
+@import "tailwind/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+.btn {
+    @apply shadow-md py-3 px-6 rounded-md transition duration-300 border-none no-underline
+}
+
+.btn-blue {
+    @apply bg-blue-500 text-white
+}
+
+.btn-white {
+    @apply bg-gray-500 text-white
+}
