@@ -54,27 +54,16 @@ fn add() {
 
 #[test]
 fn mul() {
-    let n = 2_i32.pow(4);
-    let q = 2_i32.pow(15);
-    let t = 2_i32.pow(8);
+    let poly_degree = 4;
+    let ciph_modulus = 1 << 30;
+    let big_modulus = 1 << 31;
+    let scaling_factor = 1_u32 << 10;
 
-    let key = Rwle::keygen(q, n as usize, n as usize);
+    let key = Rwle::keygen(ciph_modulus, poly_degree as usize, poly_degree as usize);
 
-    let x = 2_i32;
-    let y = 2_i32;
-
-    let datax = vec![x; n as usize];
-    let datay = vec![y; n as usize];
-
-    let cipherx = encrypt(&key.public(), n as usize, q, t, n as usize, &datax);
-    let ciphery = encrypt(&key.public(), n as usize, q, t, n as usize, &datay);
-
-    let cipherz = &cipherx * &ciphery;
-
-    let z = decrypt(&key.private(), q, t, cipherz);
-    println!("{:?}", z);
-
-    let expected_z: Vec<i32> = datax.iter().zip(&datay).map(|(a, b)| a + b).collect();
-
+    let message = [0.5, 0.3, 0.78, 0.88];
+    let plain = encode(&message, scaling_factor);
+    println!("{:?}", plain);
+    println!("{:?}", decode(plain));
     //assert_eq!(expected_z, z.coef);
 }

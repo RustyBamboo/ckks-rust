@@ -23,22 +23,20 @@ impl Modulo for i32 {
 #[derive(PartialEq, Debug, Clone)]
 pub struct PolynomialRing<T> {
     pub coef: Vec<T>,
-    pub ring: T,
-    pub pmod: usize,
+    pub poly_degree: usize,
 }
 
 #[macro_export]
 macro_rules! polynomial_ring {
-    ($r:expr, $p: expr, ($($x:expr),*)) => {
-        PolynomialRing::new($r,$p, vec![$($x), *])
+    ($p: expr, ($($x:expr),*)) => {
+        PolynomialRing::new($p, vec![$($x), *])
     }
 }
 
 impl PolynomialRing<i32> {
-    pub fn new(ring: i32, pmod: usize, coef: Vec<i32>) -> Self {
+    pub fn new(poly_degree: usize, coef: Vec<i32>) -> Self {
         // Take the mod to make sure elements are in the ring
-        let coef = coef.iter().map(|x| x.mod_ring(ring)).collect();
-        Self { coef, ring, pmod }
+        Self { coef, poly_degree }
     }
 
     pub fn len(&self) -> usize {
@@ -68,7 +66,7 @@ impl PolynomialRing<i32> {
 
     // Take the function modulo of self with (X^n + 1)
     fn mod_cyc(mut self) -> Self {
-        let n = self.pmod;
+        let n = self.poly_degree;
         if self.len() >= n {
             let diff = self.len() - n;
             for i in n..n + diff {
@@ -80,137 +78,142 @@ impl PolynomialRing<i32> {
         self
     }
 
-    pub fn check_same_basis(&self, other: &Self) -> bool {
-        self.ring == other.ring && self.pmod == other.pmod
-    }
-
-    pub fn rand_binary(ring: i32, pmod: usize, size: usize) -> Self {
+    pub fn rand_binary(poly_degree: usize, size: usize) -> Self {
         let mut rng = rand::thread_rng();
         let u = Uniform::from(0..2);
         let coef = (0..size).map(|_| u.sample(&mut rng)).collect();
-        Self { coef, ring, pmod }.clean()
+        Self { coef, poly_degree }.clean()
     }
 
-    pub fn rand_uniform(ring: i32, pmod: usize, size: usize) -> Self {
+    pub fn rand_uniform(ring: i32, poly_degree: usize, size: usize) -> Self {
         let mut rng = rand::thread_rng();
         let u = Uniform::from(0..ring);
         let coef = (0..size).map(|_| u.sample(&mut rng)).collect();
-        Self { coef, ring, pmod }.clean()
+        Self { coef, poly_degree }.clean()
     }
 
-    pub fn rand_normal(ring: i32, pmod: usize, size: usize) -> Self {
+    pub fn rand_normal(poly_degree: usize, size: usize) -> Self {
         let mut rng = rand::thread_rng();
         let n = Normal::new(0., 2.).expect("Error creating distribution");
         let coef = (0..size).map(|_| n.sample(&mut rng) as i32).collect();
-        Self { coef, ring, pmod }.clean()
+        Self { coef, poly_degree }.clean()
+    }
+}
+
+impl std::ops::Rem<i32> for PolynomialRing<i32> {
+    type Output = Self;
+    fn rem(self, other: i32) -> Self::Output {
+        &self % other
+    }
+}
+
+impl std::ops::Rem<i32> for &PolynomialRing<i32> {
+    type Output = PolynomialRing<i32>;
+    fn rem(self, other: i32) -> Self::Output {
+        let coef = self.coef.iter().map(|x| x.mod_ring(other)).collect();
+        PolynomialRing::new(self.poly_degree, coef)
     }
 }
 
 impl std::ops::Add for PolynomialRing<i32> {
     type Output = Self;
     fn add(self, other: PolynomialRing<i32>) -> Self {
-        assert!(self.check_same_basis(&other));
         let out = other
             .coef
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
-                Both(a, b) => (a + b).mod_ring(self.ring),
+                Both(a, b) => a + b,
                 Left(a) => *a,
                 Right(a) => *a,
             })
             .collect();
-        PolynomialRing::new(self.ring, self.pmod, out).mod_cyc()
+        PolynomialRing::new(self.poly_degree, out).mod_cyc()
     }
 }
 
 impl std::ops::Add<&PolynomialRing<i32>> for &PolynomialRing<i32> {
     type Output = PolynomialRing<i32>;
     fn add(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
-        assert!(self.check_same_basis(other));
         let out = other
             .coef
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
-                Both(a, b) => (a + b).mod_ring(self.ring),
+                Both(a, b) => a + b,
                 Left(a) => *a,
                 Right(a) => *a,
             })
             .collect();
-        PolynomialRing::new(self.ring, self.pmod, out).mod_cyc()
+        PolynomialRing::new(self.poly_degree, out).mod_cyc()
     }
 }
 
 impl std::ops::Add<&PolynomialRing<i32>> for PolynomialRing<i32> {
     type Output = PolynomialRing<i32>;
     fn add(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
-        assert!(self.check_same_basis(other));
         let out = other
             .coef
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
-                Both(a, b) => (a + b).mod_ring(self.ring),
+                Both(a, b) => a + b,
                 Left(a) => *a,
                 Right(a) => *a,
             })
             .collect();
-        PolynomialRing::new(self.ring, self.pmod, out).mod_cyc()
+        PolynomialRing::new(self.poly_degree, out).mod_cyc()
     }
 }
 
 impl std::ops::Sub for PolynomialRing<i32> {
     type Output = Self;
     fn sub(self, other: PolynomialRing<i32>) -> Self {
-        assert!(self.check_same_basis(&other));
         let out = other
             .coef
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
-                Both(a, b) => (b - a).mod_ring(self.ring),
+                Both(a, b) => (b - a),
                 Left(a) => *a,
                 Right(a) => *a,
             })
             .collect();
-        PolynomialRing::new(self.ring, self.pmod, out).mod_cyc()
+        PolynomialRing::new(self.poly_degree, out).mod_cyc()
     }
 }
 
 impl std::ops::Sub<&PolynomialRing<i32>> for &PolynomialRing<i32> {
     type Output = PolynomialRing<i32>;
     fn sub(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
-        assert!(self.check_same_basis(other));
         let out = other
             .coef
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
-                Both(a, b) => (b - a).mod_ring(self.ring),
+                Both(a, b) => (b - a),
                 Left(a) => *a,
                 Right(a) => *a,
             })
             .collect();
-        PolynomialRing::new(self.ring, self.pmod, out).mod_cyc()
+        PolynomialRing::new(self.poly_degree, out).mod_cyc()
     }
 }
 
 impl std::ops::Sub<&PolynomialRing<i32>> for PolynomialRing<i32> {
     type Output = PolynomialRing<i32>;
     fn sub(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
-        assert!(self.check_same_basis(other));
         let out = other
             .coef
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
-                Both(a, b) => (b - a).mod_ring(self.ring),
+                Both(a, b) => (b - a),
                 Left(a) => *a,
                 Right(a) => *a,
             })
             .collect();
-        PolynomialRing::new(self.ring, self.pmod, out).mod_cyc()
+        PolynomialRing::new(self.poly_degree, out).mod_cyc()
     }
 }
 
@@ -220,28 +223,26 @@ impl std::ops::Sub<&PolynomialRing<i32>> for PolynomialRing<i32> {
 impl std::ops::Mul for PolynomialRing<i32> {
     type Output = Self;
     fn mul(self, other: PolynomialRing<i32>) -> Self {
-        assert!(self.check_same_basis(&other));
         let mut res = vec![0; other.len() + self.len() - 1];
         for ((i1, v1), (i2, v2)) in
             iproduct!(other.coef.iter().enumerate(), self.coef.iter().enumerate())
         {
-            res[i1 + i2] += (v1 * v2).mod_ring(self.ring);
+            res[i1 + i2] += v1 * v2;
         }
-        PolynomialRing::new(self.ring, self.pmod, res).mod_cyc()
+        PolynomialRing::new(self.poly_degree, res).mod_cyc()
     }
 }
 
 impl std::ops::Mul<&PolynomialRing<i32>> for &PolynomialRing<i32> {
     type Output = PolynomialRing<i32>;
     fn mul(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
-        assert!(self.check_same_basis(&other));
         let mut res = vec![0; other.len() + self.len() - 1];
         for ((i1, v1), (i2, v2)) in
             iproduct!(other.coef.iter().enumerate(), self.coef.iter().enumerate())
         {
-            res[i1 + i2] += (v1 * v2).mod_ring(self.ring);
+            res[i1 + i2] += v1 * v2;
         }
-        PolynomialRing::new(self.ring, self.pmod, res).mod_cyc()
+        PolynomialRing::new(self.poly_degree, res).mod_cyc()
     }
 }
 
