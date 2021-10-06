@@ -1,13 +1,14 @@
-use polyr::{polynomial_ring, Modulo, PolynomialRing};
+use polyr::{Modulo, PolynomialRing};
+
+use arrayvec::ArrayVec;
 
 // b & a from equation a * s + e = b where a,s,e are randomly generated
 #[derive(Debug)]
 pub struct PublicKey<T>(pub PolynomialRing<T>, pub PolynomialRing<T>);
 // encrypted data
 #[derive(Debug)]
-pub struct CipherText<T> {
-    c0: PolynomialRing<T>,
-    c1: PolynomialRing<T>,
+pub struct CipherText<T, const N: usize> {
+    c: ArrayVec<PolynomialRing<T>, N>,
     scaling_factor: i32,
     modulus: i32,
 }
@@ -20,59 +21,62 @@ pub struct PlainText<T> {
 
 type PrivateKey<T> = PolynomialRing<T>;
 
-impl std::ops::Add for &CipherText<i32> {
-    type Output = CipherText<i32>;
-    fn add(self, other: &CipherText<i32>) -> CipherText<i32> {
+impl<const N: usize> std::ops::Add for &CipherText<i32, N> {
+    type Output = CipherText<i32, N>;
+    fn add(self, other: &CipherText<i32, N>) -> Self::Output {
         let modulus = self.modulus;
         let scaling_factor = self.scaling_factor;
+        let c = self.c.iter().zip(&other.c).map(|(x, y)| x + y).collect();
         CipherText {
-            c0: (&self.c0 + &other.c0) % modulus,
-            c1: (&self.c1 + &other.c1) % modulus,
+            c,
             modulus,
             scaling_factor,
         }
     }
 }
 
-impl std::ops::Sub for &CipherText<i32> {
-    type Output = CipherText<i32>;
-    fn sub(self, other: &CipherText<i32>) -> CipherText<i32> {
+impl<const N: usize> std::ops::Sub for &CipherText<i32, N> {
+    type Output = CipherText<i32, N>;
+    fn sub(self, other: &CipherText<i32, N>) -> Self::Output {
         let modulus = self.modulus;
         let scaling_factor = self.scaling_factor;
+        let c = self.c.iter().zip(&other.c).map(|(x, y)| x - y).collect();
         CipherText {
-            c0: (&self.c0 - &other.c0) % modulus,
-            c1: (&self.c1 - &other.c1) % modulus,
+            c,
             modulus,
             scaling_factor,
         }
     }
 }
 
-impl std::ops::Mul for &CipherText<i32> {
-    type Output = CipherText<i32>;
-    fn mul(self, other: &CipherText<i32>) -> CipherText<i32> {
-        let c0 = &self.c0 * &other.c0;
-        let c1 = &self.c0 * &other.c1 + &self.c1 * &other.c0;
-        let c2 = &self.c1 * &other.c1;
-        //CipherText {
-        //    c0: &self.c0 * &other.c0,
-        //    c1: &self.c1 * &other.c1,
-        //}
-        todo!()
+///
+/// Multiply two ciphertexts together.
+///
+/// This will increase the dimensionality of the ciphertext. In the current implementation it
+/// goes from dim 2 -> dim 3
+///
+impl std::ops::Mul for &CipherText<i32, 2> {
+    type Output = CipherText<i32, 3>;
+    fn mul(self, other: &CipherText<i32, 2>) -> Self::Output {
+        let modulus = self.modulus;
+        let scaling_factor = self.scaling_factor;
+        let c0 = &self.c[0] * &other.c[0];
+        let c1 = &self.c[1] * &other.c[1] + &self.c[1] * &other.c[0];
+        let c2 = &self.c[1] * &other.c[1];
+
+        CipherText {
+            c: [c0, c1, c2].into(),
+            modulus,
+            scaling_factor,
+        }
     }
 }
 
 ///
 /// This takes a 3-dimensional ciphertext and reduces it back into 2-dimensions
 ///
-pub fn relin(
-    relin_key: PublicKey<i32>,
-    c0: PolynomialRing<i32>,
-    c1: PolynomialRing<i32>,
-    c2: PolynomialRing<i32>,
-) {
-    // modulo * big modulus
-    let new_c0 = relin_key.0 * c2;
+pub fn relin(_relin_key: PublicKey<i32>, _c: CipherText<PolynomialRing<i32>, 3>) {
+    todo!()
 }
 
 #[derive(Debug)]
@@ -156,7 +160,7 @@ pub fn encrypt(
     t: i32,
     poly_degree: usize,
     data: &Vec<i32>,
-) -> CipherText<i32> {
+) -> CipherText<i32, 2> {
     let delta = modulus / t;
     let data = data
         .iter()
@@ -173,22 +177,28 @@ pub fn encrypt(
     let c1 = (&pk.1 * &u + &e2) % modulus;
 
     CipherText {
-        c0,
-        c1,
+        c: [c0, c1].into(),
         modulus,
         scaling_factor: delta,
     }
 }
 
-pub fn decrypt(
+pub fn decrypt<const N: usize>(
     sk: &PolynomialRing<i32>,
     modulus: i32,
     t: i32,
-    ct: CipherText<i32>,
+    ct: CipherText<i32, N>,
 ) -> PolynomialRing<i32> {
-    // ((a) * u) * s) + ((-a * s) * u) + d
-    // ~b * (~-b + d) = d cause error don't matter if you round!
-    let mut plain = (&ct.c1 * &sk + &ct.c0) % modulus;
+    //let mut plain = (&ct.c[1] * &sk + &ct.c[0]) % modulus;
+    let mut plain = ct.c[0].clone();
+    let mut sk_pow = sk.clone();
+
+    for i in 1..N {
+        plain = (plain + &sk_pow * &ct.c[i]) % modulus;
+        // TODO: This does one extra computation at last element. Fix this.
+        sk_pow = (&sk_pow * sk) % modulus;
+    }
+
     plain.coef = plain
         .coef
         .iter()
