@@ -9,13 +9,13 @@ pub struct PublicKey<T>(pub PolynomialRing<T>, pub PolynomialRing<T>);
 #[derive(Debug)]
 pub struct CipherText<T, const N: usize> {
     c: ArrayVec<PolynomialRing<T>, N>,
-    scaling_factor: i32,
+    scaling_factor: u32,
     modulus: i32,
 }
 
 #[derive(Debug)]
 pub struct PlainText<T> {
-    poly: PolynomialRing<T>,
+    pub poly: PolynomialRing<T>,
     scaling_factor: u32,
 }
 
@@ -82,7 +82,7 @@ pub fn relin(_relin_key: PublicKey<i32>, _c: CipherText<PolynomialRing<i32>, 3>)
 #[derive(Debug)]
 pub struct Rwle<T> {
     sk: PrivateKey<T>,
-    public: PublicKey<T>,
+    pk: PublicKey<T>,
 }
 
 impl Rwle<i32> {
@@ -106,7 +106,7 @@ impl Rwle<i32> {
 
         Rwle {
             sk,
-            public: PublicKey(b, a),
+            pk: PublicKey(b, a),
         }
     }
 
@@ -141,70 +141,51 @@ impl Rwle<i32> {
     }
 
     pub fn public(&self) -> &PublicKey<i32> {
-        &self.public
+        &self.pk
     }
 
-    pub fn private(&self) -> &PolynomialRing<i32> {
+    pub fn private(&self) -> &PrivateKey<i32> {
         &self.sk
-    }
-
-    pub fn encrypt() -> Result<(), ()> {
-        todo!()
     }
 }
 
-pub fn encrypt(
-    pk: &PublicKey<i32>,
-    size: usize,
-    modulus: i32,
-    t: i32,
-    poly_degree: usize,
-    data: &Vec<i32>,
-) -> CipherText<i32, 2> {
-    let delta = modulus / t;
-    let data = data
-        .iter()
-        .map(|x| (x * delta).rem_euclid(modulus))
-        .collect();
-    let data = PolynomialRing::new(poly_degree, data);
+pub fn encrypt(pk: &PublicKey<i32>, modulus: i32, plain: &PlainText<i32>) -> CipherText<i32, 2> {
+    let poly_degree = plain.poly.poly_degree;
+    let size = poly_degree;
 
     let e1 = PolynomialRing::rand_normal(poly_degree, size);
     let e2 = PolynomialRing::rand_normal(poly_degree, size);
     let u = PolynomialRing::rand_binary(poly_degree, size);
+
     // Encrypt the data with b and add error.
-    let c0 = (((&pk.0 * &u) % modulus + &e1) % modulus + &data) % modulus;
+    let c0 = (((&pk.0 * &u) % modulus + &e1) % modulus + &plain.poly) % modulus;
+
     // Apply u to pk1 to preserve integrity and add error.
     let c1 = (&pk.1 * &u + &e2) % modulus;
 
     CipherText {
         c: [c0, c1].into(),
         modulus,
-        scaling_factor: delta,
+        scaling_factor: plain.scaling_factor,
     }
 }
 
-pub fn decrypt<const N: usize>(
-    sk: &PolynomialRing<i32>,
-    modulus: i32,
-    t: i32,
-    ct: CipherText<i32, N>,
-) -> PolynomialRing<i32> {
-    //let mut plain = (&ct.c[1] * &sk + &ct.c[0]) % modulus;
-    let mut plain = ct.c[0].clone();
+pub fn decrypt<const N: usize>(sk: &PolynomialRing<i32>, ct: CipherText<i32, N>) -> PlainText<i32> {
+    let modulus = ct.modulus;
+
+    let mut poly = ct.c[0].clone();
     let mut sk_pow = sk.clone();
 
     for i in 1..N {
-        plain = (plain + &sk_pow * &ct.c[i]) % modulus;
+        poly = (poly + &sk_pow * &ct.c[i]) % modulus;
         // TODO: This does one extra computation at last element. Fix this.
         sk_pow = (&sk_pow * sk) % modulus;
     }
 
-    plain.coef = plain
-        .coef
-        .iter()
-        .map(|&x| (x as f32 * t as f32 / modulus as f32).round() as i32 % t)
-        .collect();
-    plain
+    PlainText {
+        poly,
+        scaling_factor: ct.scaling_factor,
+    }
 }
 
 pub fn encode(message: &[f32], scaling_factor: u32) -> PlainText<i32> {

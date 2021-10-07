@@ -8,3 +8,4 @@ edition = "2018"
 [dependencies]
 polyr = { path = "../polyr/" }
 arrayvec = "0.7.1"
+approx = "0.5.0"

@@ -1,10 +1,10 @@
+use approx::assert_relative_eq;
 use rlwe::*;
 
 #[test]
 fn encrypt_decrypt() {
     let n = 2_i32.pow(4);
     let q = 2_i32.pow(15);
-    let t = 2_i32.pow(8);
 
     // Create a keypair 100 times
     for _ in 0..100 {
@@ -12,44 +12,49 @@ fn encrypt_decrypt() {
         let key = Rwle::keygen(q, n as usize, n as usize);
 
         // Create our data with a single datapoint
-        let x = 73_i32;
-        let mut data = vec![0; n as usize];
-        data[0] = x.rem_euclid(t);
+        let x = 0.02_f32;
+        let mut data = vec![0f32; n as usize];
+        data[0] = x;
+
+        let plain = encode(data.as_slice(), 1u32 << 19);
 
         // Encrypt our data using keypair
-        let cipher1 = encrypt(&key.public(), n as usize, q, t, n as usize, &data);
+        let cipher1 = encrypt(key.public(), q, &plain);
 
         // Decrypt our data
-        let out = decrypt(&key.private(), q, t, cipher1);
+        let out = decrypt(&key.private(), cipher1);
 
-        assert_eq!(x, out.coef[0]);
+        let decode = decode(out);
+
+        assert_relative_eq!(x, decode[0], epsilon = 1e-4);
     }
 }
 
 #[test]
 fn add() {
-    let n = 2_i32.pow(4);
-    let q = 2_i32.pow(15);
-    let t = 2_i32.pow(8);
+    let n = 4;
+    let q = 2_i32.pow(17);
 
     let key = Rwle::keygen(q, n as usize, n as usize);
 
-    let x = 73_i32;
-    let y = 30_i32;
+    let x = [0.05, 0.1, 1.0, 0.005];
+    let y = [0.1, 0.02, 0.5, 0.3];
 
-    let datax = vec![x; n as usize];
-    let datay = vec![y; n as usize];
+    let plainx = encode(&x, 1u32 << 19);
+    let plainy = encode(&y, 1u32 << 19);
 
-    let cipherx = encrypt(&key.public(), n as usize, q, t, n as usize, &datax);
-    let ciphery = encrypt(&key.public(), n as usize, q, t, n as usize, &datay);
+    let cipherx = encrypt(&key.public(), q, &plainx);
+    let ciphery = encrypt(&key.public(), q, &plainy);
 
     let cipherz = &cipherx + &ciphery;
 
-    let z = decrypt(&key.private(), q, t, cipherz);
+    let plainz = decrypt(&key.private(), cipherz);
 
-    let expected_z: Vec<i32> = datax.iter().zip(&datay).map(|(a, b)| a + b).collect();
+    let z = decode(plainz);
 
-    assert_eq!(expected_z, z.coef);
+    let expected_z: Vec<f32> = x.iter().zip(&y).map(|(a, b)| a + b).collect();
+
+    assert_eq!(expected_z, z);
 }
 
 #[test]
