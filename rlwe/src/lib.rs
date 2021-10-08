@@ -1,6 +1,8 @@
 use polyr::{Modulo, PolynomialRing};
 
 use num_bigint::{BigInt, BigUint, ToBigInt, ToBigUint};
+use num_rational::Ratio;
+use num_traits::cast::ToPrimitive;
 
 use arrayvec::ArrayVec;
 
@@ -88,7 +90,7 @@ pub struct Rwle<T> {
 }
 
 impl Rwle<BigInt> {
-    pub fn keygen(modulus: BigInt, poly_degree: usize, size: usize) -> Self {
+    pub fn keygen(modulus: &BigInt, poly_degree: usize, size: usize) -> Self {
         // Our secret key
         let sk = PrivateKey::rand_binary(poly_degree, size);
 
@@ -112,7 +114,11 @@ impl Rwle<BigInt> {
         }
     }
 
-    pub fn switch_key(&self, big_modulo: &BigInt, new_key: &PolynomialRing<BigInt>) -> PublicKey<BigInt> {
+    pub fn switch_key(
+        &self,
+        big_modulo: &BigInt,
+        new_key: &PolynomialRing<BigInt>,
+    ) -> PublicKey<BigInt> {
         let mod_squared = big_modulo * big_modulo;
 
         let swk = PolynomialRing::rand_uniform(&mod_squared, self.sk.poly_degree, self.sk.len());
@@ -151,7 +157,11 @@ impl Rwle<BigInt> {
     }
 }
 
-pub fn encrypt(pk: &PublicKey<BigInt>, modulus: BigInt, plain: &PlainText<BigInt>) -> CipherText<BigInt, 2> {
+pub fn encrypt(
+    pk: &PublicKey<BigInt>,
+    modulus: &BigInt,
+    plain: &PlainText<BigInt>,
+) -> CipherText<BigInt, 2> {
     let poly_degree = plain.poly.poly_degree;
     let size = poly_degree;
 
@@ -167,12 +177,15 @@ pub fn encrypt(pk: &PublicKey<BigInt>, modulus: BigInt, plain: &PlainText<BigInt
 
     CipherText {
         c: [c0, c1].into(),
-        modulus,
+        modulus: modulus.clone(),
         scaling_factor: plain.scaling_factor.clone(),
     }
 }
 
-pub fn decrypt<const N: usize>(sk: &PolynomialRing<BigInt>, ct: CipherText<BigInt, N>) -> PlainText<BigInt> {
+pub fn decrypt<const N: usize>(
+    sk: &PolynomialRing<BigInt>,
+    ct: CipherText<BigInt, N>,
+) -> PlainText<BigInt> {
     let modulus = ct.modulus;
 
     let mut poly = ct.c[0].clone();
@@ -201,11 +214,15 @@ pub fn encode(message: &[f64], scaling_factor: usize) -> PlainText<BigInt> {
     }
 }
 
-pub fn decode(plain: PlainText<BigInt>) -> Vec<BigInt> {
+pub fn decode(plain: PlainText<BigInt>) -> Vec<f64> {
     plain
         .poly
         .coef
         .iter()
-        .map(|x| x / plain.scaling_factor.to_bigint().unwrap())
+        .map(|x| {
+            Ratio::new(x.clone(), plain.scaling_factor.to_bigint().unwrap())
+                .to_f64()
+                .unwrap()
+        })
         .collect()
 }
