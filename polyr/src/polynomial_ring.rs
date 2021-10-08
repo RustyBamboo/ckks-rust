@@ -81,7 +81,7 @@ impl PolynomialRing<BigInt> {
         let coef = (0..size)
             .map(|_| u.sample(&mut rng).to_bigint().unwrap())
             .collect();
-        Self { coef, poly_degree }.clean()
+        Self { coef, poly_degree }
     }
 
     pub fn rand_uniform(ring: &BigInt, poly_degree: usize, size: usize) -> Self {
@@ -93,7 +93,7 @@ impl PolynomialRing<BigInt> {
                     .unwrap()
             })
             .collect();
-        Self { coef, poly_degree }.clean()
+        Self { coef, poly_degree }
     }
 
     pub fn rand_normal(poly_degree: usize, size: usize) -> Self {
@@ -102,7 +102,7 @@ impl PolynomialRing<BigInt> {
         let coef = (0..size)
             .map(|_| n.sample(&mut rng).to_bigint().unwrap())
             .collect();
-        Self { coef, poly_degree }.clean()
+        Self { coef, poly_degree }
     }
 }
 
