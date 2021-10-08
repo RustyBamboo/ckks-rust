@@ -2,21 +2,25 @@ use itertools::{iproduct, EitherOrBoth::*, Itertools};
 use rand::distributions::{Distribution, Uniform};
 use rand_distr::Normal;
 
+use num_bigint::{BigInt, RandBigInt, ToBigInt};
+use num_traits::{Zero, One};
+
 ///
 /// Takes a number and maps it into the space (q/2, q/2] for some number q.
 ///
-pub fn mod_ring(num: i32, q: i32) -> i32 {
-    let num = num.rem_euclid(q);
+pub fn mod_ring(num: &BigInt, q: &BigInt) -> BigInt {
+    // This takes the modulus rather than remainder
+    let num = ((num % q) + q) % q;
 
     return if num > q / 2 { num - q } else { num };
 }
 
 pub trait Modulo {
-    fn mod_ring(self, q: Self) -> Self;
+    fn mod_ring(&self, q: &Self) -> Self;
 }
-impl Modulo for i32 {
-    fn mod_ring(self, q: Self) -> Self {
-        return mod_ring(self, q);
+impl Modulo for BigInt {
+    fn mod_ring(&self, q: &Self) -> Self {
+        return mod_ring(&self, &q);
     }
 }
 
@@ -26,15 +30,8 @@ pub struct PolynomialRing<T> {
     pub poly_degree: usize,
 }
 
-#[macro_export]
-macro_rules! polynomial_ring {
-    ($p: expr, ($($x:expr),*)) => {
-        PolynomialRing::new($p, vec![$($x), *])
-    }
-}
-
-impl PolynomialRing<i32> {
-    pub fn new(poly_degree: usize, coef: Vec<i32>) -> Self {
+impl PolynomialRing<BigInt> {
+    pub fn new(poly_degree: usize, coef: Vec<BigInt>) -> Self {
         // Take the mod to make sure elements are in the ring
         Self { coef, poly_degree }
     }
@@ -53,7 +50,7 @@ impl PolynomialRing<i32> {
         {
             let coef = self.coef.iter().rev();
             for c in coef {
-                if *c == 0 {
+                if *c == Zero::zero() {
                     count += 1;
                 } else {
                     break;
@@ -70,8 +67,8 @@ impl PolynomialRing<i32> {
         if self.len() >= n {
             let diff = self.len() - n;
             for i in n..n + diff {
-                self.coef[i - n] -= self.coef[i];
-                self.coef[i] = 0;
+                self.coef[i - n] = self.coef[i - n].clone() - self.coef[i].clone();
+                self.coef[i] = Zero::zero();
             }
             self.coef.drain(n..);
         }
@@ -81,136 +78,145 @@ impl PolynomialRing<i32> {
     pub fn rand_binary(poly_degree: usize, size: usize) -> Self {
         let mut rng = rand::thread_rng();
         let u = Uniform::from(0..2);
-        let coef = (0..size).map(|_| u.sample(&mut rng)).collect();
+        let coef = (0..size)
+            .map(|_| u.sample(&mut rng).to_bigint().unwrap())
+            .collect();
         Self { coef, poly_degree }.clean()
     }
 
-    pub fn rand_uniform(ring: i32, poly_degree: usize, size: usize) -> Self {
+    pub fn rand_uniform(ring: &BigInt, poly_degree: usize, size: usize) -> Self {
         let mut rng = rand::thread_rng();
-        let u = Uniform::from(0..ring);
-        let coef = (0..size).map(|_| u.sample(&mut rng)).collect();
+        let coef = (0..size)
+            .map(|_| {
+                rng.gen_bigint_range(&Zero::zero(), &ring)
+                    .to_bigint()
+                    .unwrap()
+            })
+            .collect();
         Self { coef, poly_degree }.clean()
     }
 
     pub fn rand_normal(poly_degree: usize, size: usize) -> Self {
         let mut rng = rand::thread_rng();
         let n = Normal::new(0., 2.).expect("Error creating distribution");
-        let coef = (0..size).map(|_| n.sample(&mut rng) as i32).collect();
+        let coef = (0..size)
+            .map(|_| n.sample(&mut rng).to_bigint().unwrap())
+            .collect();
         Self { coef, poly_degree }.clean()
     }
 }
 
-impl std::ops::Rem<i32> for PolynomialRing<i32> {
+impl std::ops::Rem<&BigInt> for PolynomialRing<BigInt> {
     type Output = Self;
-    fn rem(self, other: i32) -> Self::Output {
+    fn rem(self, other: &BigInt) -> Self::Output {
         &self % other
     }
 }
 
-impl std::ops::Rem<i32> for &PolynomialRing<i32> {
-    type Output = PolynomialRing<i32>;
-    fn rem(self, other: i32) -> Self::Output {
-        let coef = self.coef.iter().map(|x| x.mod_ring(other)).collect();
+impl std::ops::Rem<&BigInt> for &PolynomialRing<BigInt> {
+    type Output = PolynomialRing<BigInt>;
+    fn rem(self, other: &BigInt) -> Self::Output {
+        let coef = self.coef.iter().map(|x| x.mod_ring(&other)).collect();
         PolynomialRing::new(self.poly_degree, coef)
     }
 }
 
-impl std::ops::Add for PolynomialRing<i32> {
+impl std::ops::Add for PolynomialRing<BigInt> {
     type Output = Self;
-    fn add(self, other: PolynomialRing<i32>) -> Self {
+    fn add(self, other: PolynomialRing<BigInt>) -> Self {
         let out = other
             .coef
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
                 Both(a, b) => a + b,
-                Left(a) => *a,
-                Right(a) => *a,
+                Left(a) => a.clone(),
+                Right(a) => a.clone(),
             })
             .collect();
         PolynomialRing::new(self.poly_degree, out).mod_cyc()
     }
 }
 
-impl std::ops::Add<&PolynomialRing<i32>> for &PolynomialRing<i32> {
-    type Output = PolynomialRing<i32>;
-    fn add(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
+impl std::ops::Add<&PolynomialRing<BigInt>> for &PolynomialRing<BigInt> {
+    type Output = PolynomialRing<BigInt>;
+    fn add(self, other: &PolynomialRing<BigInt>) -> PolynomialRing<BigInt> {
         let out = other
             .coef
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
                 Both(a, b) => a + b,
-                Left(a) => *a,
-                Right(a) => *a,
+                Left(a) => a.clone(),
+                Right(a) => a.clone(),
             })
             .collect();
         PolynomialRing::new(self.poly_degree, out).mod_cyc()
     }
 }
 
-impl std::ops::Add<&PolynomialRing<i32>> for PolynomialRing<i32> {
-    type Output = PolynomialRing<i32>;
-    fn add(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
+impl std::ops::Add<&PolynomialRing<BigInt>> for PolynomialRing<BigInt> {
+    type Output = PolynomialRing<BigInt>;
+    fn add(self, other: &PolynomialRing<BigInt>) -> PolynomialRing<BigInt> {
         let out = other
             .coef
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
                 Both(a, b) => a + b,
-                Left(a) => *a,
-                Right(a) => *a,
+                Left(a) => a.clone(),
+                Right(a) => a.clone(),
             })
             .collect();
         PolynomialRing::new(self.poly_degree, out).mod_cyc()
     }
 }
 
-impl std::ops::Sub for PolynomialRing<i32> {
+impl std::ops::Sub for PolynomialRing<BigInt> {
     type Output = Self;
-    fn sub(self, other: PolynomialRing<i32>) -> Self {
+    fn sub(self, other: PolynomialRing<BigInt>) -> Self {
         let out = other
             .coef
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
                 Both(a, b) => (b - a),
-                Left(a) => *a,
-                Right(a) => *a,
+                Left(a) => a.clone(),
+                Right(a) => a.clone(),
             })
             .collect();
         PolynomialRing::new(self.poly_degree, out).mod_cyc()
     }
 }
 
-impl std::ops::Sub<&PolynomialRing<i32>> for &PolynomialRing<i32> {
-    type Output = PolynomialRing<i32>;
-    fn sub(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
+impl std::ops::Sub<&PolynomialRing<BigInt>> for &PolynomialRing<BigInt> {
+    type Output = PolynomialRing<BigInt>;
+    fn sub(self, other: &PolynomialRing<BigInt>) -> PolynomialRing<BigInt> {
         let out = other
             .coef
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
                 Both(a, b) => (b - a),
-                Left(a) => *a,
-                Right(a) => *a,
+                Left(a) => a.clone(),
+                Right(a) => a.clone(),
             })
             .collect();
         PolynomialRing::new(self.poly_degree, out).mod_cyc()
     }
 }
 
-impl std::ops::Sub<&PolynomialRing<i32>> for PolynomialRing<i32> {
-    type Output = PolynomialRing<i32>;
-    fn sub(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
+impl std::ops::Sub<&PolynomialRing<BigInt>> for PolynomialRing<BigInt> {
+    type Output = PolynomialRing<BigInt>;
+    fn sub(self, other: &PolynomialRing<BigInt>) -> PolynomialRing<BigInt> {
         let out = other
             .coef
             .iter()
             .zip_longest(self.coef.iter())
             .map(|x| match x {
                 Both(a, b) => (b - a),
-                Left(a) => *a,
-                Right(a) => *a,
+                Left(a) => a.clone(),
+                Right(a) => a.clone(),
             })
             .collect();
         PolynomialRing::new(self.poly_degree, out).mod_cyc()
@@ -220,10 +226,10 @@ impl std::ops::Sub<&PolynomialRing<i32>> for PolynomialRing<i32> {
 // TODO: Use FFT to do this in O(nlogn) instead of O(n^2)
 //
 // See; https://math.stackexchange.com/questions/764727/concrete-fft-polynomial-multiplication-example
-impl std::ops::Mul for PolynomialRing<i32> {
+impl std::ops::Mul for PolynomialRing<BigInt> {
     type Output = Self;
-    fn mul(self, other: PolynomialRing<i32>) -> Self {
-        let mut res = vec![0; other.len() + self.len() - 1];
+    fn mul(self, other: PolynomialRing<BigInt>) -> Self {
+        let mut res = vec![Zero::zero(); other.len() + self.len() - 1];
         for ((i1, v1), (i2, v2)) in
             iproduct!(other.coef.iter().enumerate(), self.coef.iter().enumerate())
         {
@@ -233,10 +239,10 @@ impl std::ops::Mul for PolynomialRing<i32> {
     }
 }
 
-impl std::ops::Mul<&PolynomialRing<i32>> for &PolynomialRing<i32> {
-    type Output = PolynomialRing<i32>;
-    fn mul(self, other: &PolynomialRing<i32>) -> PolynomialRing<i32> {
-        let mut res = vec![0; other.len() + self.len() - 1];
+impl std::ops::Mul<&PolynomialRing<BigInt>> for &PolynomialRing<BigInt> {
+    type Output = PolynomialRing<BigInt>;
+    fn mul(self, other: &PolynomialRing<BigInt>) -> PolynomialRing<BigInt> {
+        let mut res = vec![Zero::zero(); other.len() + self.len() - 1];
         for ((i1, v1), (i2, v2)) in
             iproduct!(other.coef.iter().enumerate(), self.coef.iter().enumerate())
         {
@@ -246,7 +252,7 @@ impl std::ops::Mul<&PolynomialRing<i32>> for &PolynomialRing<i32> {
     }
 }
 
-impl std::fmt::Display for PolynomialRing<i32> {
+impl std::fmt::Display for PolynomialRing<BigInt> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let coef = &self.coef;
         if coef.is_empty() {
@@ -254,7 +260,7 @@ impl std::fmt::Display for PolynomialRing<i32> {
         }
         let mut is_first = true;
         for (i, c) in coef.iter().enumerate().rev() {
-            if *c == 0 {
+            if *c == Zero::zero() {
                 continue;
             }
             if is_first {
@@ -262,7 +268,7 @@ impl std::fmt::Display for PolynomialRing<i32> {
             } else {
                 write!(f, "+")?
             }
-            if *c == 1 {
+            if *c == One::one() {
                 match i {
                     0 => write!(f, "1")?,
                     1 => write!(f, "x")?,

@@ -2,6 +2,9 @@ pub use polyr::Modulo;
 pub use polyr::{polynomial, Polynomial};
 pub use polyr::{polynomial_ring, PolynomialRing};
 
+use num_bigint::{BigInt, ToBigInt};
+use num_traits::{One, Zero};
+
 #[test]
 fn mod_cyc() {
     let mut poly = polynomial![0, 77, 7, 11, 12, 1];
@@ -27,10 +30,10 @@ fn mul() {
 
 #[test]
 fn sub() {
-    let a = polynomial_ring!(4, (1, 1, 1, 1));
-    let b = polynomial_ring!(4, (0, 0, 0));
-    let c = (a - b) % 13;
-    assert_eq!(polynomial_ring!(4, (1, 1, 1, 1)), c);
+    let a = PolynomialRing::new(4, vec![One::one(); 4]);
+    let b = PolynomialRing::new(4, vec![Zero::zero(); 3]);
+    let c = (a - b) % &13.to_bigint().unwrap();
+    assert_eq!(PolynomialRing::new(4, vec![One::one(); 4]), c);
 }
 
 #[test]
@@ -64,63 +67,89 @@ fn mul_field_mod_cyc() {
 
 #[test]
 fn test_modulo() {
-    let q = 13;
+    let q = 13.to_bigint().unwrap();
 
     let x = [1, 6, 7, 13, 14, 26, 27, -26, -14, -13, -7, -6, -1];
-    let y: Vec<i32> = x.iter().map(|&a| a.mod_ring(q)).collect();
-    assert_eq!(vec![1, 6, -6, 0, 1, 0, 1, 0, -1, 0, 6, -6, -1], y);
+    let x: Vec<BigInt> = x.iter().map(|x| x.to_bigint().unwrap()).collect();
+    let y: Vec<BigInt> = x.iter().map(|a| a.mod_ring(&q)).collect();
+
+    let expected: Vec<BigInt> = [1, 6, -6, 0, 1, 0, 1, 0, -1, 0, 6, -6, -1]
+        .iter()
+        .map(|x| x.to_bigint().unwrap())
+        .collect();
+    assert_eq!(expected, y);
 }
 
 #[test]
 fn rlwe() {
     let n = 2 * 2; // n = 2^k = len(a)
-    let q = 13; // q = 1 mod 2n
+    let q = 13.to_bigint().unwrap(); // q = 1 mod 2n
 
-    let a = polynomial_ring!(n, (10, 11, 1, 4)) % q;
-    let s = polynomial_ring!(n, (11, 11, 9, 6)) % q;
-    let e = polynomial_ring!(n, (1, 1, -1, 0)) % q;
+    let a = vec![10, 11, 1, 4]
+        .iter()
+        .map(|x| x.to_bigint().unwrap())
+        .collect();
+    let s = vec![11, 11, 9, 6]
+        .iter()
+        .map(|x| x.to_bigint().unwrap())
+        .collect();
+    let e = vec![1, 1, -1, 0]
+        .iter()
+        .map(|x| x.to_bigint().unwrap())
+        .collect();
 
-    let c = ((a * s) % q + e) % q;
+    let a = PolynomialRing::new(n, a) % &q;
+    let s = PolynomialRing::new(n, s) % &q;
+    let e = PolynomialRing::new(n, e) % &q;
 
-    assert_eq!(polynomial_ring!(n, (5, -5, 2, 6)), c);
+    let c = ((a * s) % &q + e) % &q;
+
+    let expected: Vec<BigInt> = [5, -5, 2, 6]
+        .iter()
+        .map(|x| x.to_bigint().unwrap())
+        .collect();
+    assert_eq!(PolynomialRing::new(n, expected), c);
 }
 
 #[test]
 fn overflow_add() {
     let n = 4;
-    let q = 13;
+    let q = 13.to_bigint().unwrap();
 
-    let a = polynomial_ring!(n, (i32::MAX, i32::MAX)) % q;
-    let b = polynomial_ring!(n, (1, 2));
+    let max = i32::MAX.to_bigint().unwrap();
 
-    let c = (a + b) % q;
+    let a = PolynomialRing::new(n, vec![max.clone(), max]) % &q;
+    let b = PolynomialRing::new(n, vec![One::one(), 2.to_bigint().unwrap()]);
 
-    assert_eq!(polynomial_ring!(n, (-2, -1)), c);
+    let c = (a + b) % &q;
+
+    assert_eq!(
+        PolynomialRing::new(n, vec![-2.to_bigint().unwrap(), -1.to_bigint().unwrap()]),
+        c
+    );
 }
 
 #[test]
 fn overflow_mul() {
     let n = 4;
-    let q = 13;
+    let q = 13.to_bigint().unwrap();
 
-    let a = polynomial_ring!(n, (i32::MAX, i32::MAX)) % q;
-    let b = polynomial_ring!(n, (2, 2)) % q;
+    let max = i32::MAX.to_bigint().unwrap();
 
-    let c = (a * b) % q;
+    let a = PolynomialRing::new(n, vec![max.clone(), max]) % &q;
+    let b = PolynomialRing::new(n, vec![2.to_bigint().unwrap(), 2.to_bigint().unwrap()]);
 
-    assert_eq!(polynomial_ring!(n, (-6, 1, -6)), c);
-}
+    let c = (a * b) % &q;
 
-#[allow(unused_variables)]
-#[test]
-fn rand() {
-    let n = 4;
-    let q = 13;
-
-    let a = PolynomialRing::rand_binary(n, 4);
-    let b = PolynomialRing::rand_uniform(q, n, 4);
-    let c = PolynomialRing::rand_normal(n, 4);
-    println!("{}", a);
-    println!("{}", b);
-    println!("{}", c);
+    assert_eq!(
+        PolynomialRing::new(
+            n,
+            vec![
+                -6.to_bigint().unwrap(),
+                1.to_bigint().unwrap(),
+                -6.to_bigint().unwrap()
+            ]
+        ),
+        c
+    );
 }

@@ -9,3 +9,5 @@ edition = "2018"
 polyr = { path = "../polyr/" }
 arrayvec = "0.7.1"
 approx = "0.5.0"
+num-bigint = "0.4.2"
+num-traits = "0.2.14" 
