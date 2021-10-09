@@ -3,7 +3,7 @@ use rand::distributions::{Distribution, Uniform};
 use rand_distr::Normal;
 
 use num_bigint::{BigInt, RandBigInt, ToBigInt};
-use num_traits::{Zero, One};
+use num_traits::{One, Zero};
 
 ///
 /// Takes a number and maps it into the space (q/2, q/2] for some number q.

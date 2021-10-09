@@ -1,8 +1,16 @@
+#![feature(int_log)]
+
+pub mod encoder;
+
+use encoder::CKKSEncoder;
+
 use polyr::{Modulo, PolynomialRing};
 
 use num_bigint::{BigInt, BigUint, ToBigInt, ToBigUint};
+use num_complex::Complex64;
 use num_rational::Ratio;
 use num_traits::cast::ToPrimitive;
+use num_traits::Zero;
 
 use arrayvec::ArrayVec;
 
@@ -15,6 +23,39 @@ pub struct CipherText<T, const N: usize> {
     c: ArrayVec<PolynomialRing<T>, N>,
     scaling_factor: BigUint,
     modulus: BigInt,
+}
+
+impl<T, const N: usize> CipherText<T, N> {
+    pub fn dim(&self) -> usize {
+        self.c.len()
+    }
+}
+
+impl CipherText<BigInt, 3> {
+    ///
+    /// This takes a 3-dimensional ciphertext and reduces it back into 2-dimensions
+    ///
+    pub fn relin(
+        &self,
+        relin_key: &PublicKey<BigInt>,
+        big_modulus: &BigInt,
+    ) -> CipherText<BigInt, 2> {
+        let modulus = &self.modulus;
+
+        let mut new_c0 = (&relin_key.0 * &self.c[2]) % &(modulus * big_modulus);
+        new_c0.coef = new_c0.coef.iter().map(|x| x / big_modulus).collect();
+        new_c0 = (new_c0 + &self.c[0]) % &modulus;
+
+        let mut new_c1 = (&relin_key.1 * &self.c[2]) % &(modulus * big_modulus);
+        new_c1.coef = new_c1.coef.iter().map(|x| x / big_modulus).collect();
+        new_c1 = (new_c1 + &self.c[1]) % &modulus;
+
+        CipherText {
+            c: [new_c0, new_c1].into(),
+            modulus: modulus.clone(),
+            scaling_factor: self.scaling_factor.clone(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -63,24 +104,22 @@ impl std::ops::Mul for &CipherText<BigInt, 2> {
     type Output = CipherText<BigInt, 3>;
     fn mul(self, other: &CipherText<BigInt, 2>) -> Self::Output {
         let modulus = self.modulus.clone();
-        let scaling_factor = self.scaling_factor.clone();
+
         let c0 = &self.c[0] * &other.c[0];
-        let c1 = &self.c[1] * &other.c[1] + &self.c[1] * &other.c[0];
+        let c0 = c0 % &modulus;
+
+        let c1 = &self.c[0] * &other.c[1] + &other.c[0] * &self.c[1];
+        let c1 = c1 % &modulus;
+
         let c2 = &self.c[1] * &other.c[1];
+        let c2 = c2 % &modulus;
 
         CipherText {
             c: [c0, c1, c2].into(),
             modulus,
-            scaling_factor,
+            scaling_factor: &self.scaling_factor * &other.scaling_factor,
         }
     }
-}
-
-///
-/// This takes a 3-dimensional ciphertext and reduces it back into 2-dimensions
-///
-pub fn relin(_relin_key: PublicKey<BigInt>, _c: CipherText<PolynomialRing<BigInt>, 3>) {
-    todo!()
 }
 
 #[derive(Debug)]
@@ -194,8 +233,10 @@ pub fn decrypt<const N: usize>(
     for i in 1..N {
         poly = (poly + &sk_pow * &ct.c[i]) % &modulus;
         // TODO: This does one extra computation at last element. Fix this.
-        sk_pow = (&sk_pow * sk) % &modulus;
+        sk_pow = (&sk_pow * &sk) % &modulus;
     }
+
+    let poly = poly % &modulus;
 
     PlainText {
         poly,
@@ -203,26 +244,47 @@ pub fn decrypt<const N: usize>(
     }
 }
 
-pub fn encode(message: &[f64], scaling_factor: usize) -> PlainText<BigInt> {
-    let coef = message
-        .iter()
-        .map(|x| ((x * scaling_factor as f64) as i128).to_bigint().unwrap())
-        .collect();
+pub fn encode(message: &[f64], scaling_factor: usize, encoder: &CKKSEncoder) -> PlainText<BigInt> {
+    let num_values = message.len();
+    let plain_len = num_values << 1;
+
+    let message = message.iter().map(|&x| Complex64::new(x, 0.)).collect();
+
+    let to_scale = encoder.embedding_inv(message);
+
+    let mut coef = vec![Zero::zero(); plain_len];
+
+    for i in 0..num_values {
+        coef[i] = (to_scale[i].re * scaling_factor as f64 + 0.5)
+            .to_bigint()
+            .unwrap();
+        coef[i + num_values] = (to_scale[i].im * scaling_factor as f64 + 0.5)
+            .to_bigint()
+            .unwrap();
+    }
+
     PlainText {
-        poly: PolynomialRing::new(message.len(), coef),
+        poly: PolynomialRing::new(plain_len, coef),
         scaling_factor: scaling_factor.to_biguint().unwrap(),
     }
 }
 
-pub fn decode(plain: PlainText<BigInt>) -> Vec<f64> {
-    plain
-        .poly
-        .coef
-        .iter()
-        .map(|x| {
-            Ratio::new(x.clone(), plain.scaling_factor.to_bigint().unwrap())
-                .to_f64()
-                .unwrap()
-        })
-        .collect()
+pub fn decode(plain: PlainText<BigInt>, encoder: &CKKSEncoder) -> Vec<Complex64> {
+    let scaling_factor = plain.scaling_factor.to_bigint().unwrap();
+    let plain_len = plain.poly.len();
+    let num_values = plain_len >> 1;
+
+    let mut coef = vec![Complex64::zero(); num_values];
+
+    for i in 0..num_values {
+        let r1 = Ratio::new(plain.poly.coef[i].clone(), scaling_factor.clone());
+        let r2 = Ratio::new(
+            plain.poly.coef[i + num_values].clone(),
+            scaling_factor.clone(),
+        );
+
+        coef[i] = Complex64::new(r1.to_f64().unwrap(), r2.to_f64().unwrap());
+    }
+
+    encoder.embedding(coef)
 }

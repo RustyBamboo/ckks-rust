@@ -47,5 +47,17 @@ $$\mathbb{Z}_q[x] / (x^n + 1)$$
 Now addition and multiplication over the polynomials are done \texttt{mod} $x^n + 1$ (i.e. divide the result by $x^n + 1$ and take the remainder). The insures that all of our polynomials have degree $d < n$
 
 
+\section{CKKS Encoding}
+
+Let our message be $\mathbb{C}^{N/2}$, that is we have $N/2$ complex numbers.
+
+Let $\zeta = \exp(\frac{2\pi i}{2N})$, a complex (2N)th root of unity. Define $\sigma$ as
+
+$$
+\sigma(p(x)) \mapsto [p(\zeta), p(\zeta^3), \hdots, p(\zeta^{2N-1})]
+$$
+
+Since, $p(x)$ has rational coefficients, for any complex number $z$, we have $\overline{p(z)} = p(\overline{z})$
+
 
 \end{document}
