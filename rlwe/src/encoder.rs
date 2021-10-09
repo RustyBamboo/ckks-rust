@@ -69,6 +69,8 @@ impl CKKSEncoder {
     }
 
     pub fn embedding(&self, coeffs: Vec<Complex64>) -> Vec<Complex64> {
+        assert!(coeffs.len() <= self.fft_length);
+
         let num_coeffs = coeffs.len();
         let mut result = bit_reverse_vec(coeffs);
 
@@ -98,6 +100,8 @@ impl CKKSEncoder {
     }
 
     pub fn embedding_inv(&self, coeffs: Vec<Complex64>) -> Vec<Complex64> {
+        assert!(coeffs.len() <= self.fft_length);
+
         let num_coeffs = coeffs.len();
         let mut result = coeffs;
 
