@@ -1,0 +1,93 @@
+\documentclass{article}
+    \usepackage{svg}
+    \usepackage{float}
+    % General document formatting
+    \usepackage[margin=0.7in]{geometry}
+    \usepackage[parfill]{parskip}
+    \usepackage[utf8]{inputenc}
+    
+    % Related to math
+    \usepackage{amsmath,amssymb,amsfonts,amsthm}
+    \usepackage{color}
+    \usepackage{hyperref}
+    \hypersetup{
+        linktocpage=true,
+        colorlinks=true,
+        linkcolor=blue, 
+        urlcolor  = blue,
+    }
+
+\makeatletter
+\newcommand{\escapeus}{\begingroup\@makeother\_\@escapeus}
+\newcommand*{\@escapeus}[1]{#1\endgroup}
+\makeatother
+
+
+\title{Benchmarks - v.0.1.0}
+\author{Quphase}
+\date{}
+
+
+\begin{document}
+
+\maketitle
+\abstract{Benchmarking performed on AMD Ryzen 9 5900X 12-Core Processor @ 4.7 GHz using \href{https://github.com/bheisler/criterion.rs}{Criterion.rs.}}
+\tableofcontents
+\newpage
+
+\section{Keys}
+\subsection{Key Generation}
+\begin{figure}[H]
+    \centering
+    \escapeus{\includesvg[width=\textwidth]{figs/keygen.svg}}
+\end{figure}
+
+\subsection{Relinearization/Switching Key Generation}
+\begin{figure}[H]
+    \centering
+    \escapeus{\includesvg[width=\textwidth]{figs/keygen_relin.svg}}
+\end{figure}  
+\newpage
+
+\section{Encoder}
+\subsection{Encoder Creation}
+\begin{figure}[H]
+    \centering
+    \escapeus{\includesvg[width=\textwidth]{figs/encoder_creation.svg}}
+\end{figure} 
+
+\subsection{Encoding}
+\begin{figure}[H]
+    \centering
+    \escapeus{\includesvg[width=\textwidth]{figs/encoder.svg}}
+\end{figure}  
+
+\newpage
+
+\section{Encryption}
+\begin{figure}[H]
+    \centering
+    \escapeus{\includesvg[width=\textwidth]{figs/encryption.svg}}
+\end{figure} 
+
+\newpage
+
+\section{Addition}
+\begin{figure}[H]
+    \centering
+    \escapeus{\includesvg[width=\textwidth]{figs/addition.svg}}
+\end{figure} 
+\newpage
+
+\section{Multiplication}
+\begin{figure}[H]
+    \centering
+    \escapeus{\includesvg[width=\textwidth]{figs/multiplication.svg}}
+\end{figure}
+\newpage
+
+
+
+
+
+\end{document}
