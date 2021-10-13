@@ -1,26 +1,7 @@
 use num_complex::Complex64;
 use std::f64::consts::PI;
 
-///
-/// Reverse bits of an integer with specified width.
-///
-/// E.g. Reverse 6 = 0b110 with a width of 5 would result in reversing 0b00110, which becomes
-/// 0b01100 = 12
-///
-pub fn reverse_bits(value: usize, width: u32) -> usize {
-    value.reverse_bits() >> (usize::BITS - width)
-}
-
-///
-/// Reverse an array by reversing bits of indicides
-///
-pub fn bit_reverse_vec<T>(mut values: Vec<T>) -> Vec<T> {
-    let len = values.len();
-    for i in 0..len / 2 {
-        values.swap(i, reverse_bits(i, len.log2()));
-    }
-    values
-}
+use algebra::utils::bit_reverse_vec;
 
 ///
 /// Algorithms from "Improved Bootstrapping for Approximate Homomorphic Encryption"
@@ -68,7 +49,7 @@ impl CKKSEncoder {
         }
     }
 
-    pub fn embedding(&self, coeffs: Vec<Complex64>) -> Vec<Complex64> {
+    pub fn embedding(&self, coeffs: &Vec<Complex64>) -> Vec<Complex64> {
         assert!(coeffs.len() <= self.fft_length);
 
         let num_coeffs = coeffs.len();
@@ -99,11 +80,11 @@ impl CKKSEncoder {
         result
     }
 
-    pub fn embedding_inv(&self, coeffs: Vec<Complex64>) -> Vec<Complex64> {
+    pub fn embedding_inv(&self, coeffs: &Vec<Complex64>) -> Vec<Complex64> {
         assert!(coeffs.len() <= self.fft_length);
 
         let num_coeffs = coeffs.len();
-        let mut result = coeffs;
+        let mut result = coeffs.clone();
 
         let log_num_coeffs = num_coeffs.log2();
 
@@ -127,7 +108,7 @@ impl CKKSEncoder {
                 }
             }
         }
-        let to_scale_down = bit_reverse_vec(result);
+        let to_scale_down = bit_reverse_vec(&result);
 
         to_scale_down
             .iter()

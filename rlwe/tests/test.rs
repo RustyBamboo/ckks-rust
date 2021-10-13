@@ -124,7 +124,8 @@ fn mul_relin() {
     let cipherx = encrypt(&key.public(), &ciph_modulus, &plainx);
     let ciphery = encrypt(&key.public(), &ciph_modulus, &plainy);
 
-    let cipherz_relin = (&cipherx * &ciphery).relin(&relin_key, &big_modulus);
+    let prod = &cipherx * &ciphery;
+    let cipherz_relin = prod.relin(&relin_key, &big_modulus);
     let plainz_relin = decrypt(&key.private(), cipherz_relin);
     let z_relin = decode(plainz_relin, &encoder);
 
@@ -136,7 +137,7 @@ fn mul_relin() {
 
 #[test]
 fn reverse_bits() {
-    use encoder::reverse_bits;
+    use algebra::utils::reverse_bits;
     let x = 6;
     assert_eq!(reverse_bits(x, 5), 12);
 }

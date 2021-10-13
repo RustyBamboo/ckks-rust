@@ -29,6 +29,34 @@ fn mul() {
 }
 
 #[test]
+fn mul_ntt() {
+    let n = 4;
+    use algebra::ntt::Ntt;
+
+    let q = 73.to_bigint().unwrap();
+
+    let ntt = Ntt::new(n, 73);
+    let a: Vec<BigInt> = vec![10, 11, 1, 4]
+        .iter()
+        .map(|x| x.to_bigint().unwrap())
+        .collect();
+    let b: Vec<BigInt> = vec![11, 11, 9, 6]
+        .iter()
+        .map(|x| x.to_bigint().unwrap())
+        .collect();
+    let a_p = PolynomialRing::new_with_ntt(n, a.clone(), &ntt);
+    let b_p = PolynomialRing::new_with_ntt(n, b.clone(), &ntt);
+
+    let a_p2 = PolynomialRing::new(n, a);
+    let b_p2 = PolynomialRing::new(n, b);
+
+    let c_p = (&a_p * &b_p) % &q;
+    let c_p2 = (&a_p2 * &b_p2) % &q;
+
+    assert_eq!(c_p, c_p2);
+}
+
+#[test]
 fn sub() {
     let a = PolynomialRing::new(4, vec![One::one(); 4]);
     let b = PolynomialRing::new(4, vec![Zero::zero(); 3]);
@@ -102,7 +130,7 @@ fn rlwe() {
     let s = PolynomialRing::new(n, s) % &q;
     let e = PolynomialRing::new(n, e) % &q;
 
-    let c = ((a * s) % &q + e) % &q;
+    let c = ((&a * &s) % &q + e) % &q;
 
     let expected: Vec<BigInt> = [5, -5, 2, 6]
         .iter()
@@ -139,7 +167,7 @@ fn overflow_mul() {
     let a = PolynomialRing::new(n, vec![max.clone(), max]) % &q;
     let b = PolynomialRing::new(n, vec![2.to_bigint().unwrap(), 2.to_bigint().unwrap()]);
 
-    let c = (a * b) % &q;
+    let c = (&a * &b) % &q;
 
     assert_eq!(
         PolynomialRing::new(

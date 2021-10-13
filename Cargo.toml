@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "polyr",
-    "rlwe"
+    "rlwe",
+    "algebra",
 ]

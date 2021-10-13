@@ -1,5 +1,4 @@
 #![feature(int_log)]
-
 pub mod encoder;
 
 use encoder::CKKSEncoder;
@@ -16,29 +15,29 @@ use arrayvec::ArrayVec;
 
 // b & a from equation a * s + e = b where a,s,e are randomly generated
 #[derive(Debug)]
-pub struct PublicKey<T>(pub PolynomialRing<T>, pub PolynomialRing<T>);
+pub struct PublicKey<'n, T>(pub PolynomialRing<'n, T>, pub PolynomialRing<'n, T>);
 // encrypted data
 #[derive(Debug)]
-pub struct CipherText<T, const N: usize> {
-    c: ArrayVec<PolynomialRing<T>, N>,
+pub struct CipherText<'n, T, const N: usize> {
+    c: ArrayVec<PolynomialRing<'n, T>, N>,
     scaling_factor: BigUint,
     modulus: BigInt,
 }
 
-impl<T, const N: usize> CipherText<T, N> {
+impl<T, const N: usize> CipherText<'_, T, N> {
     pub fn dim(&self) -> usize {
         self.c.len()
     }
 }
 
-impl CipherText<BigInt, 3> {
+impl<'n> CipherText<'n, BigInt, 3> {
     ///
     /// This takes a 3-dimensional ciphertext and reduces it back into 2-dimensions
     ///
     pub fn relin(
         &self,
-        relin_key: &PublicKey<BigInt>,
-        big_modulus: &BigInt,
+        relin_key: &'n PublicKey<BigInt>,
+        big_modulus: &'n BigInt,
     ) -> CipherText<BigInt, 2> {
         let modulus = &self.modulus;
 
@@ -59,16 +58,16 @@ impl CipherText<BigInt, 3> {
 }
 
 #[derive(Debug)]
-pub struct PlainText<T> {
-    pub poly: PolynomialRing<T>,
+pub struct PlainText<'n, T> {
+    pub poly: PolynomialRing<'n, T>,
     scaling_factor: BigUint,
 }
 
-type PrivateKey<T> = PolynomialRing<T>;
+type PrivateKey<'n, T> = PolynomialRing<'n, T>;
 
-impl<const N: usize> std::ops::Add for &CipherText<BigInt, N> {
-    type Output = CipherText<BigInt, N>;
-    fn add(self, other: &CipherText<BigInt, N>) -> Self::Output {
+impl<'n, const N: usize> std::ops::Add for &CipherText<'n, BigInt, N> {
+    type Output = CipherText<'n, BigInt, N>;
+    fn add(self, other: &CipherText<'n, BigInt, N>) -> Self::Output {
         let modulus = self.modulus.clone();
         let scaling_factor = self.scaling_factor.clone();
         let c = self.c.iter().zip(&other.c).map(|(x, y)| x + y).collect();
@@ -80,9 +79,9 @@ impl<const N: usize> std::ops::Add for &CipherText<BigInt, N> {
     }
 }
 
-impl<const N: usize> std::ops::Sub for &CipherText<BigInt, N> {
-    type Output = CipherText<BigInt, N>;
-    fn sub(self, other: &CipherText<BigInt, N>) -> Self::Output {
+impl<'n, const N: usize> std::ops::Sub for &CipherText<'n, BigInt, N> {
+    type Output = CipherText<'n, BigInt, N>;
+    fn sub(self, other: &CipherText<'n, BigInt, N>) -> Self::Output {
         let modulus = self.modulus.clone();
         let scaling_factor = self.scaling_factor.clone();
         let c = self.c.iter().zip(&other.c).map(|(x, y)| x - y).collect();
@@ -100,9 +99,9 @@ impl<const N: usize> std::ops::Sub for &CipherText<BigInt, N> {
 /// This will increase the dimensionality of the ciphertext. In the current implementation it
 /// goes from dim 2 -> dim 3
 ///
-impl std::ops::Mul for &CipherText<BigInt, 2> {
-    type Output = CipherText<BigInt, 3>;
-    fn mul(self, other: &CipherText<BigInt, 2>) -> Self::Output {
+impl<'a, 'b, 'n> std::ops::Mul<&'b CipherText<'n, BigInt, 2>> for &'a CipherText<'n, BigInt, 2> {
+    type Output = CipherText<'n, BigInt, 3>;
+    fn mul(self, other: &'b CipherText<'n, BigInt, 2>) -> Self::Output {
         let modulus = self.modulus.clone();
 
         let c0 = &self.c[0] * &other.c[0];
@@ -123,12 +122,12 @@ impl std::ops::Mul for &CipherText<BigInt, 2> {
 }
 
 #[derive(Debug)]
-pub struct Rwle<T> {
-    sk: PrivateKey<T>,
-    pk: PublicKey<T>,
+pub struct Rwle<'n, T> {
+    sk: PrivateKey<'n, T>,
+    pk: PublicKey<'n, T>,
 }
 
-impl Rwle<BigInt> {
+impl Rwle<'_, BigInt> {
     pub fn keygen(modulus: &BigInt, poly_degree: usize, size: usize) -> Self {
         // Our secret key
         let sk = PrivateKey::rand_binary(poly_degree, size);
@@ -196,11 +195,11 @@ impl Rwle<BigInt> {
     }
 }
 
-pub fn encrypt(
-    pk: &PublicKey<BigInt>,
+pub fn encrypt<'n>(
+    pk: &'n PublicKey<BigInt>,
     modulus: &BigInt,
-    plain: &PlainText<BigInt>,
-) -> CipherText<BigInt, 2> {
+    plain: &'n PlainText<BigInt>,
+) -> CipherText<'n, BigInt, 2> {
     let poly_degree = plain.poly.poly_degree;
     let size = poly_degree;
 
@@ -221,10 +220,10 @@ pub fn encrypt(
     }
 }
 
-pub fn decrypt<const N: usize>(
-    sk: &PolynomialRing<BigInt>,
-    ct: CipherText<BigInt, N>,
-) -> PlainText<BigInt> {
+pub fn decrypt<'n, const N: usize>(
+    sk: &'n PolynomialRing<BigInt>,
+    ct: CipherText<'n, BigInt, N>,
+) -> PlainText<'n, BigInt> {
     let modulus = ct.modulus;
 
     let mut poly = ct.c[0].clone();
@@ -244,13 +243,17 @@ pub fn decrypt<const N: usize>(
     }
 }
 
-pub fn encode(message: &[f64], scaling_factor: usize, encoder: &CKKSEncoder) -> PlainText<BigInt> {
+pub fn encode<'n>(
+    message: &[f64],
+    scaling_factor: usize,
+    encoder: &CKKSEncoder,
+) -> PlainText<'n, BigInt> {
     let num_values = message.len();
     let plain_len = num_values << 1;
 
     let message = message.iter().map(|&x| Complex64::new(x, 0.)).collect();
 
-    let to_scale = encoder.embedding_inv(message);
+    let to_scale = encoder.embedding_inv(&message);
 
     let mut coef = vec![Zero::zero(); plain_len];
 
@@ -286,5 +289,5 @@ pub fn decode(plain: PlainText<BigInt>, encoder: &CKKSEncoder) -> Vec<Complex64>
         coef[i] = Complex64::new(r1.to_f64().unwrap(), r2.to_f64().unwrap());
     }
 
-    encoder.embedding(coef)
+    encoder.embedding(&coef)
 }

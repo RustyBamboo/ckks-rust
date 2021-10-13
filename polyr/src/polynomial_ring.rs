@@ -3,7 +3,9 @@ use rand::distributions::{Distribution, Uniform};
 use rand_distr::Normal;
 
 use num_bigint::{BigInt, RandBigInt, ToBigInt};
-use num_traits::{One, Zero};
+use num_traits::{One, ToPrimitive, Zero};
+
+use algebra::ntt::Ntt;
 
 ///
 /// Takes a number and maps it into the space (q/2, q/2] for some number q.
@@ -24,16 +26,39 @@ impl Modulo for BigInt {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
-pub struct PolynomialRing<T> {
+#[derive(Debug, Clone)]
+pub struct PolynomialRing<'n, T> {
     pub coef: Vec<T>,
     pub poly_degree: usize,
+    ntt: Option<&'n Ntt>,
 }
 
-impl PolynomialRing<BigInt> {
+impl<T> PartialEq for PolynomialRing<'_, T>
+where
+    Vec<T>: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.coef == other.coef && self.poly_degree == other.poly_degree
+    }
+}
+
+impl<'a> PolynomialRing<'a, BigInt> {
     pub fn new(poly_degree: usize, coef: Vec<BigInt>) -> Self {
         // Take the mod to make sure elements are in the ring
-        Self { coef, poly_degree }
+        Self {
+            coef,
+            poly_degree,
+            ntt: None,
+        }
+    }
+
+    pub fn new_with_ntt(poly_degree: usize, coef: Vec<BigInt>, ntt: &'a Ntt) -> Self {
+        // Take the mod to make sure elements are in the ring
+        Self {
+            coef,
+            poly_degree,
+            ntt: Some(ntt),
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -81,7 +106,11 @@ impl PolynomialRing<BigInt> {
         let coef = (0..size)
             .map(|_| u.sample(&mut rng).to_bigint().unwrap())
             .collect();
-        Self { coef, poly_degree }
+        Self {
+            coef,
+            poly_degree,
+            ntt: None,
+        }
     }
 
     pub fn rand_uniform(ring: &BigInt, poly_degree: usize, size: usize) -> Self {
@@ -93,7 +122,11 @@ impl PolynomialRing<BigInt> {
                     .unwrap()
             })
             .collect();
-        Self { coef, poly_degree }
+        Self {
+            coef,
+            poly_degree,
+            ntt: None,
+        }
     }
 
     pub fn rand_normal(poly_degree: usize, size: usize) -> Self {
@@ -102,26 +135,30 @@ impl PolynomialRing<BigInt> {
         let coef = (0..size)
             .map(|_| n.sample(&mut rng).to_bigint().unwrap())
             .collect();
-        Self { coef, poly_degree }
+        Self {
+            coef,
+            poly_degree,
+            ntt: None,
+        }
     }
 }
 
-impl std::ops::Rem<&BigInt> for PolynomialRing<BigInt> {
+impl<'a> std::ops::Rem<&BigInt> for PolynomialRing<'a, BigInt> {
     type Output = Self;
     fn rem(self, other: &BigInt) -> Self::Output {
         &self % other
     }
 }
 
-impl std::ops::Rem<&BigInt> for &PolynomialRing<BigInt> {
-    type Output = PolynomialRing<BigInt>;
+impl<'a> std::ops::Rem<&BigInt> for &PolynomialRing<'a, BigInt> {
+    type Output = PolynomialRing<'a, BigInt>;
     fn rem(self, other: &BigInt) -> Self::Output {
         let coef = self.coef.iter().map(|x| x.mod_ring(&other)).collect();
         PolynomialRing::new(self.poly_degree, coef)
     }
 }
 
-impl std::ops::Add for PolynomialRing<BigInt> {
+impl<'a> std::ops::Add for PolynomialRing<'a, BigInt> {
     type Output = Self;
     fn add(self, other: PolynomialRing<BigInt>) -> Self {
         let out = other
@@ -138,9 +175,9 @@ impl std::ops::Add for PolynomialRing<BigInt> {
     }
 }
 
-impl std::ops::Add<&PolynomialRing<BigInt>> for &PolynomialRing<BigInt> {
-    type Output = PolynomialRing<BigInt>;
-    fn add(self, other: &PolynomialRing<BigInt>) -> PolynomialRing<BigInt> {
+impl<'a> std::ops::Add<&PolynomialRing<'a, BigInt>> for &PolynomialRing<'a, BigInt> {
+    type Output = PolynomialRing<'a, BigInt>;
+    fn add(self, other: &PolynomialRing<BigInt>) -> Self::Output {
         let out = other
             .coef
             .iter()
@@ -155,9 +192,9 @@ impl std::ops::Add<&PolynomialRing<BigInt>> for &PolynomialRing<BigInt> {
     }
 }
 
-impl std::ops::Add<&PolynomialRing<BigInt>> for PolynomialRing<BigInt> {
-    type Output = PolynomialRing<BigInt>;
-    fn add(self, other: &PolynomialRing<BigInt>) -> PolynomialRing<BigInt> {
+impl<'a> std::ops::Add<&PolynomialRing<'a, BigInt>> for PolynomialRing<'a, BigInt> {
+    type Output = PolynomialRing<'a, BigInt>;
+    fn add(self, other: &PolynomialRing<BigInt>) -> Self::Output {
         let out = other
             .coef
             .iter()
@@ -172,7 +209,7 @@ impl std::ops::Add<&PolynomialRing<BigInt>> for PolynomialRing<BigInt> {
     }
 }
 
-impl std::ops::Sub for PolynomialRing<BigInt> {
+impl<'a> std::ops::Sub for PolynomialRing<'a, BigInt> {
     type Output = Self;
     fn sub(self, other: PolynomialRing<BigInt>) -> Self {
         let out = other
@@ -189,9 +226,9 @@ impl std::ops::Sub for PolynomialRing<BigInt> {
     }
 }
 
-impl std::ops::Sub<&PolynomialRing<BigInt>> for &PolynomialRing<BigInt> {
-    type Output = PolynomialRing<BigInt>;
-    fn sub(self, other: &PolynomialRing<BigInt>) -> PolynomialRing<BigInt> {
+impl<'a> std::ops::Sub<&PolynomialRing<'a, BigInt>> for &PolynomialRing<'a, BigInt> {
+    type Output = PolynomialRing<'a, BigInt>;
+    fn sub(self, other: &PolynomialRing<BigInt>) -> Self::Output {
         let out = other
             .coef
             .iter()
@@ -206,9 +243,9 @@ impl std::ops::Sub<&PolynomialRing<BigInt>> for &PolynomialRing<BigInt> {
     }
 }
 
-impl std::ops::Sub<&PolynomialRing<BigInt>> for PolynomialRing<BigInt> {
-    type Output = PolynomialRing<BigInt>;
-    fn sub(self, other: &PolynomialRing<BigInt>) -> PolynomialRing<BigInt> {
+impl<'a> std::ops::Sub<&PolynomialRing<'a, BigInt>> for PolynomialRing<'a, BigInt> {
+    type Output = PolynomialRing<'a, BigInt>;
+    fn sub(self, other: &PolynomialRing<BigInt>) -> Self::Output {
         let out = other
             .coef
             .iter()
@@ -226,9 +263,22 @@ impl std::ops::Sub<&PolynomialRing<BigInt>> for PolynomialRing<BigInt> {
 // TODO: Use FFT to do this in O(nlogn) instead of O(n^2)
 //
 // See; https://math.stackexchange.com/questions/764727/concrete-fft-polynomial-multiplication-example
-impl std::ops::Mul for PolynomialRing<BigInt> {
-    type Output = Self;
-    fn mul(self, other: PolynomialRing<BigInt>) -> Self {
+impl<'a> std::ops::Mul<&PolynomialRing<'a, BigInt>> for &PolynomialRing<'a, BigInt> {
+    type Output = PolynomialRing<'a, BigInt>;
+    fn mul(self, other: &PolynomialRing<BigInt>) -> Self::Output {
+        if let Some(ntt) = self.ntt {
+            let a = self.coef.iter().map(|x| x.to_i128().unwrap()).collect();
+            let b = other.coef.iter().map(|x| x.to_i128().unwrap()).collect();
+            let a = ntt.fft_fwd(&a);
+            let b = ntt.fft_fwd(&b);
+            let c = (0..self.poly_degree).map(|i| a[i] * b[i]).collect();
+            let res = ntt
+                .fft_inv(&c)
+                .iter()
+                .map(|x| x.to_bigint().unwrap())
+                .collect();
+            return PolynomialRing::new(self.poly_degree, res).mod_cyc();
+        }
         let mut res = vec![Zero::zero(); other.len() + self.len() - 1];
         for ((i1, v1), (i2, v2)) in
             iproduct!(other.coef.iter().enumerate(), self.coef.iter().enumerate())
@@ -239,20 +289,7 @@ impl std::ops::Mul for PolynomialRing<BigInt> {
     }
 }
 
-impl std::ops::Mul<&PolynomialRing<BigInt>> for &PolynomialRing<BigInt> {
-    type Output = PolynomialRing<BigInt>;
-    fn mul(self, other: &PolynomialRing<BigInt>) -> PolynomialRing<BigInt> {
-        let mut res = vec![Zero::zero(); other.len() + self.len() - 1];
-        for ((i1, v1), (i2, v2)) in
-            iproduct!(other.coef.iter().enumerate(), self.coef.iter().enumerate())
-        {
-            res[i1 + i2] += v1 * v2;
-        }
-        PolynomialRing::new(self.poly_degree, res).mod_cyc()
-    }
-}
-
-impl std::fmt::Display for PolynomialRing<BigInt> {
+impl std::fmt::Display for PolynomialRing<'_, BigInt> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let coef = &self.coef;
         if coef.is_empty() {
