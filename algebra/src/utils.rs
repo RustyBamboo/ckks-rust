@@ -165,3 +165,30 @@ where
 
     powmod(g, (modulus - _1) / order, modulus)
 }
+
+pub fn generate_primes(num_primes: u64, prime_size: u64, modulus: u64) -> Vec<u64> {
+    use primes::is_prime;
+    let mut result = Vec::with_capacity(num_primes as usize);
+    let mut possible_prime = (1 << prime_size) + 1;
+    for _ in 0..num_primes {
+        possible_prime += modulus;
+        while !is_prime(possible_prime) {
+            possible_prime += modulus;
+        }
+        result.push(possible_prime);
+    }
+    result
+}
+
+#[test]
+fn primes_test() {
+    let num_primes = 4;
+    let prime_size = 9;
+    let poly_degree = 256;
+
+    let primes = generate_primes(num_primes, prime_size, 2 * poly_degree);
+    for p in primes {
+        assert!(p > (1 << prime_size) + 1);
+        assert_eq!(p % (2 * poly_degree), 1);
+    }
+}
