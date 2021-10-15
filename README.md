@@ -23,3 +23,26 @@ firefox target/criterion/report/index.html
 
 Some compiled version results can be found in `whitepaper/benchmarks/`
 
+### Flamegraph
+
+This will generate a flamegraph that visualizes the time spent by the CPU in a given stack frame.
+
+Some dependencies:
+
+- `perf`. E.g. for Debian-based distros: `apt install linux-tools-generic`
+- `cargo install flamegraph`
+
+Run the profiler for everything:
+```
+cargo flamegraph --bench benchmark  -- --bench
+```
+
+or for a specific benchmark:
+```
+cargo flamegraph --bench benchmark  -- multiplication/Multiplication/4096 --bench
+```
+
+Then look at the flamegraph:
+```
+firefox flamegraph.svg
+```

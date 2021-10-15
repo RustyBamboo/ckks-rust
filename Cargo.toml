@@ -4,3 +4,6 @@ members = [
     "rlwe",
     "algebra",
 ]
+
+[profile.bench]
+debug = true
