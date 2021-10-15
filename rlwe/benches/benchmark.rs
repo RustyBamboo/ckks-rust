@@ -123,7 +123,12 @@ fn multiplication_benchmark(c: &mut Criterion) {
         });
         group.bench_function(
             BenchmarkId::new("Multiplication w/ Relin", poly_degree),
-            |b| b.iter(|| (&cipher * &cipher).relin(&relin_key, &big_modulus)),
+            |b| {
+                b.iter(|| {
+                    let mult = &cipher * &cipher;
+                    mult.relin(&relin_key, &big_modulus);
+                })
+            },
         );
     }
     group.finish()

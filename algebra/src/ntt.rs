@@ -1,4 +1,6 @@
-use crate::utils::{bit_reverse_vec, invmod, root_of_unity};
+use crate::utils::{bit_reverse_vec, invmod, root_of_unity, RemEuclid};
+use num_bigint::BigInt;
+use num_traits::One;
 
 ///
 /// Parameters for Number/Fermat Theoretic Transform
@@ -7,8 +9,8 @@ use crate::utils::{bit_reverse_vec, invmod, root_of_unity};
 pub struct Ntt {
     coeff_modulus: u64,
     degree: u64,
-    pub roots_of_unity: Vec<i128>,
-    pub roots_of_unity_inv: Vec<i128>,
+    pub roots_of_unity: Vec<BigInt>,
+    pub roots_of_unity_inv: Vec<BigInt>,
 }
 
 impl Ntt {
@@ -21,17 +23,16 @@ impl Ntt {
         let root_of_unity = root_of_unity(2 * degree as i128, coeff_modulus as i128);
         let root_of_unity_inv = invmod(root_of_unity, coeff_modulus as i128);
 
-        let mut roots_of_unity = vec![1_i128; degree as usize];
-        let mut roots_of_unity_inv = vec![1_i128; degree as usize];
+        let mut roots_of_unity = vec![One::one(); degree as usize];
+        let mut roots_of_unity_inv = vec![One::one(); degree as usize];
 
         for i in 1..degree as usize {
-            roots_of_unity[i] =
-                (roots_of_unity[i - 1] * root_of_unity).rem_euclid(coeff_modulus as i128);
+            roots_of_unity[i] = (&roots_of_unity[i - 1] * &root_of_unity) % coeff_modulus;
         }
 
         for i in 1..degree as usize {
             roots_of_unity_inv[i] =
-                (roots_of_unity_inv[i - 1] * root_of_unity_inv).rem_euclid(coeff_modulus as i128);
+                (&roots_of_unity_inv[i - 1] * &root_of_unity_inv) % coeff_modulus;
         }
 
         Ntt {
@@ -42,7 +43,7 @@ impl Ntt {
         }
     }
 
-    pub fn ntt(&self, coeffs: &Vec<i128>, rou: &Vec<i128>) -> Vec<i128> {
+    pub fn ntt(&self, coeffs: &Vec<BigInt>, rou: &Vec<BigInt>) -> Vec<BigInt> {
         assert!(
             coeffs.len() == coeffs.len(),
             "Length of roots of unity is too small"
@@ -60,13 +61,13 @@ impl Ntt {
                     let index_odd = j + i + (1 << (logm - 1));
 
                     let rou_idx = i << (1 + log_num_coeffs - logm);
-                    let omega_factor = (rou[rou_idx as usize] * result[index_odd])
-                        .rem_euclid(self.coeff_modulus as i128);
+                    let omega_factor =
+                        (&rou[rou_idx as usize] * &result[index_odd]) % self.coeff_modulus;
 
                     let butterfly_plus =
-                        (result[index_even] + omega_factor).rem_euclid(self.coeff_modulus as i128);
+                        (&result[index_even] + &omega_factor).rem_euclid(&self.coeff_modulus);
                     let butterfly_minus =
-                        (result[index_even] - omega_factor).rem_euclid(self.coeff_modulus as i128);
+                        (&result[index_even] - &omega_factor).rem_euclid(&self.coeff_modulus);
 
                     result[index_even] = butterfly_plus;
                     result[index_odd] = butterfly_minus;
@@ -76,7 +77,7 @@ impl Ntt {
         result
     }
 
-    pub fn fft_fwd(&self, coeffs: &Vec<i128>) -> Vec<i128> {
+    pub fn fft_fwd(&self, coeffs: &Vec<BigInt>) -> Vec<BigInt> {
         let num_coeffs = coeffs.len();
 
         assert!(
@@ -84,14 +85,14 @@ impl Ntt {
             "fft_fwd: input length does not match degree"
         );
 
-        let fft_input: Vec<i128> = (0..num_coeffs)
-            .map(|i| (coeffs[i] * self.roots_of_unity[i]).rem_euclid(self.coeff_modulus as i128))
+        let fft_input: Vec<BigInt> = (0..num_coeffs)
+            .map(|i| (&coeffs[i] * &self.roots_of_unity[i]) % self.coeff_modulus)
             .collect();
 
         self.ntt(&fft_input, &self.roots_of_unity)
     }
 
-    pub fn fft_inv(&self, coeffs: &Vec<i128>) -> Vec<i128> {
+    pub fn fft_inv(&self, coeffs: &Vec<BigInt>) -> Vec<BigInt> {
         let num_coeffs = coeffs.len();
         assert!(
             num_coeffs == self.degree as usize,
@@ -103,7 +104,7 @@ impl Ntt {
 
         (0..num_coeffs)
             .map(|i| {
-                (to_scale_down[i] * self.roots_of_unity_inv[i] * poly_degree_inv)
+                (&to_scale_down[i] * &self.roots_of_unity_inv[i] * poly_degree_inv)
                     % self.coeff_modulus as i128
             })
             .collect()

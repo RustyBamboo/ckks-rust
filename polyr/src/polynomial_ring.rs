@@ -5,7 +5,10 @@ use rand_distr::Normal;
 use num_bigint::{BigInt, RandBigInt, ToBigInt};
 use num_traits::{One, ToPrimitive, Zero};
 
+use algebra::crt::Crt;
 use algebra::ntt::Ntt;
+
+use rayon::prelude::*;
 
 ///
 /// Takes a number and maps it into the space (q/2, q/2] for some number q.
@@ -30,7 +33,7 @@ impl Modulo for BigInt {
 pub struct PolynomialRing<'n, T> {
     pub coef: Vec<T>,
     pub poly_degree: usize,
-    ntt: Option<&'n Ntt>,
+    crt: Option<&'n Crt>,
 }
 
 impl<T> PartialEq for PolynomialRing<'_, T>
@@ -48,16 +51,16 @@ impl<'a> PolynomialRing<'a, BigInt> {
         Self {
             coef,
             poly_degree,
-            ntt: None,
+            crt: None,
         }
     }
 
-    pub fn new_with_ntt(poly_degree: usize, coef: Vec<BigInt>, ntt: &'a Ntt) -> Self {
+    pub fn new_with_crt(poly_degree: usize, coef: Vec<BigInt>, crt: &'a Crt) -> Self {
         // Take the mod to make sure elements are in the ring
         Self {
             coef,
             poly_degree,
-            ntt: Some(ntt),
+            crt: Some(crt),
         }
     }
 
@@ -109,7 +112,7 @@ impl<'a> PolynomialRing<'a, BigInt> {
         Self {
             coef,
             poly_degree,
-            ntt: None,
+            crt: None,
         }
     }
 
@@ -125,7 +128,7 @@ impl<'a> PolynomialRing<'a, BigInt> {
         Self {
             coef,
             poly_degree,
-            ntt: None,
+            crt: None,
         }
     }
 
@@ -138,7 +141,7 @@ impl<'a> PolynomialRing<'a, BigInt> {
         Self {
             coef,
             poly_degree,
-            ntt: None,
+            crt: None,
         }
     }
 }
@@ -266,18 +269,34 @@ impl<'a> std::ops::Sub<&PolynomialRing<'a, BigInt>> for PolynomialRing<'a, BigIn
 impl<'a> std::ops::Mul<&PolynomialRing<'a, BigInt>> for &PolynomialRing<'a, BigInt> {
     type Output = PolynomialRing<'a, BigInt>;
     fn mul(self, other: &PolynomialRing<BigInt>) -> Self::Output {
-        if let Some(ntt) = self.ntt {
-            let a = self.coef.iter().map(|x| x.to_i128().unwrap()).collect();
-            let b = other.coef.iter().map(|x| x.to_i128().unwrap()).collect();
-            let a = ntt.fft_fwd(&a);
-            let b = ntt.fft_fwd(&b);
-            let c = (0..self.poly_degree).map(|i| a[i] * b[i]).collect();
-            let res = ntt
-                .fft_inv(&c)
-                .iter()
-                .map(|x| x.to_bigint().unwrap())
+        if let Some(crt) = self.crt {
+            let a = &self.coef;
+            let b = &other.coef;
+
+            let mul_ntt = |ntt: &Ntt| {
+                let a = ntt.fft_fwd(&a);
+                let b = ntt.fft_fwd(&b);
+                let c = (0..self.poly_degree).map(|i| &a[i] * &b[i]).collect();
+                let res = ntt
+                    .fft_inv(&c)
+                    .iter()
+                    .map(|x| x.to_bigint().unwrap())
+                    .collect();
+                return PolynomialRing::new(self.poly_degree, res).mod_cyc();
+            };
+
+            let prod: Vec<PolynomialRing<_>> = crt.ntts.iter().map(|n| mul_ntt(n)).collect();
+
+            let final_coeffs = (0..self.poly_degree)
+                .into_par_iter()
+                .map(|i| {
+                    let vals = prod.iter().map(|p| p.coef[i].to_i128().unwrap()).collect();
+                    crt.reconstruct(vals)
+                        .mod_ring(&crt.modulus.to_bigint().unwrap())
+                })
                 .collect();
-            return PolynomialRing::new(self.poly_degree, res).mod_cyc();
+
+            return PolynomialRing::new(self.poly_degree, final_coeffs).mod_cyc();
         }
         let mut res = vec![Zero::zero(); other.len() + self.len() - 1];
         for ((i1, v1), (i2, v2)) in

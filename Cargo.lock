@@ -10,6 +10,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "primes",
+ "rayon",
 ]
 
 [[package]]
@@ -426,6 +427,7 @@ dependencies = [
  "num-traits",
  "rand",
  "rand_distr",
+ "rayon",
 ]
 
 [[package]]

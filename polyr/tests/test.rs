@@ -29,31 +29,43 @@ fn mul() {
 }
 
 #[test]
-fn mul_ntt() {
-    let n = 4;
-    use algebra::ntt::Ntt;
+fn mul_crt() {
+    use algebra::crt::Crt;
 
-    let q = 73.to_bigint().unwrap();
+    let log_modulus = 10;
+    let modulus = 1 << log_modulus;
 
-    let ntt = Ntt::new(n, 73);
-    let a: Vec<BigInt> = vec![10, 11, 1, 4]
+    let prime_size = 30;
+
+    let log_poly_degree = 2;
+    let poly_degree = 1 << log_poly_degree;
+
+    let num_primes = (2 + log_poly_degree + 4 * log_modulus + prime_size - 1) / prime_size;
+    //let num_primes = 4;
+    println!("Num of primes: {}", num_primes);
+
+    let crt = Crt::new(num_primes, prime_size, poly_degree);
+
+    let a: Vec<BigInt> = [0, 1, 4, 5]
         .iter()
         .map(|x| x.to_bigint().unwrap())
         .collect();
-    let b: Vec<BigInt> = vec![11, 11, 9, 6]
+    let b: Vec<BigInt> = [1, 2, 4, 3]
         .iter()
         .map(|x| x.to_bigint().unwrap())
         .collect();
-    let a_p = PolynomialRing::new_with_ntt(n, a.clone(), &ntt);
-    let b_p = PolynomialRing::new_with_ntt(n, b.clone(), &ntt);
+    let a_ex = PolynomialRing::new(poly_degree as usize, a.clone());
+    let b_ex = PolynomialRing::new(poly_degree as usize, b.clone());
 
-    let a_p2 = PolynomialRing::new(n, a);
-    let b_p2 = PolynomialRing::new(n, b);
+    let a = PolynomialRing::new_with_crt(poly_degree as usize, a, &crt);
+    let b = PolynomialRing::new_with_crt(poly_degree as usize, b, &crt);
 
-    let c_p = (&a_p * &b_p) % &q;
-    let c_p2 = (&a_p2 * &b_p2) % &q;
+    let c_ex = &a_ex * &b_ex % &modulus.to_bigint().unwrap();
 
-    assert_eq!(c_p, c_p2);
+    let c = (&a * &b) % &modulus.to_bigint().unwrap();
+
+    println!("{:?}", c_ex);
+    println!("{:?}", c);
 }
 
 #[test]

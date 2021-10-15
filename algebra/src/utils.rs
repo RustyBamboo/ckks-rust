@@ -1,5 +1,25 @@
+use num_bigint::BigInt;
 use num_traits::{One, PrimInt, Zero};
-use std::ops::{AddAssign, BitAnd, DivAssign, ShrAssign, SubAssign};
+use std::ops::{Add, AddAssign, BitAnd, DivAssign, Rem, ShrAssign, SubAssign};
+
+///
+/// Mimic the behavior of std::ops::RemEuclid but for other types, such as BigInt
+///
+pub trait RemEuclid<'a, T> {
+    fn rem_euclid(&'a self, rem: &'a T) -> Self;
+}
+
+impl<'a, T> RemEuclid<'a, T> for BigInt
+where
+    T: 'a + Rem,
+    &'a BigInt: Rem<&'a T, Output = BigInt>,
+    BigInt: Add<&'a T, Output = BigInt>,
+    BigInt: Rem<&'a T, Output = BigInt>,
+{
+    fn rem_euclid(&'a self, rem: &'a T) -> BigInt {
+        ((self % rem) + rem) % rem
+    }
+}
 
 ///
 /// Reverse bits of an integer with specified width.
