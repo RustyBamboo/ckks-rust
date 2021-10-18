@@ -9,4 +9,5 @@
 **.toc
 **.pdf_tex
 **.data
+**.data.old
 flamegraph.svg

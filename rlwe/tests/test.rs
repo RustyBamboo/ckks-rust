@@ -31,7 +31,7 @@ fn encrypt_decrypt() {
 
         // Create our data with a single datapoint
         let x = 0.02_64;
-        let data = vec![x; n / 2 as usize];
+        let data = vec![x; n / 2_usize];
 
         let plain = encode(data.as_slice(), 1usize << 30, &encoder);
 
@@ -39,7 +39,7 @@ fn encrypt_decrypt() {
         let cipher1 = encrypt(key.public(), &q, &plain);
 
         // Decrypt our data
-        let out = decrypt(&key.private(), cipher1);
+        let out = decrypt(key.private(), cipher1);
 
         let decode = decode(out, &encoder);
 
@@ -62,12 +62,12 @@ fn add() {
     let plainx = encode(&x, 1usize << 30, &encoder);
     let plainy = encode(&y, 1usize << 30, &encoder);
 
-    let cipherx = encrypt(&key.public(), &q, &plainx);
-    let ciphery = encrypt(&key.public(), &q, &plainy);
+    let cipherx = encrypt(key.public(), &q, &plainx);
+    let ciphery = encrypt(key.public(), &q, &plainy);
 
     let cipherz = &cipherx + &ciphery;
 
-    let plainz = decrypt(&key.private(), cipherz);
+    let plainz = decrypt(key.private(), cipherz);
 
     let z = decode(plainz, &encoder);
 
@@ -92,12 +92,12 @@ fn mul() {
     let plainx = encode(&x, scaling_factor, &encoder);
     let plainy = encode(&y, scaling_factor, &encoder);
 
-    let cipherx = encrypt(&key.public(), &ciph_modulus, &plainx);
-    let ciphery = encrypt(&key.public(), &ciph_modulus, &plainy);
+    let cipherx = encrypt(key.public(), &ciph_modulus, &plainx);
+    let ciphery = encrypt(key.public(), &ciph_modulus, &plainy);
 
     let cipherz = &cipherx * &ciphery;
 
-    let plainz = decrypt(&key.private(), cipherz);
+    let plainz = decrypt(key.private(), cipherz);
 
     let z = decode(plainz, &encoder);
     let expected_z: Vec<f64> = x.iter().zip(&y).map(|(a, b)| a * b).collect();
@@ -123,12 +123,12 @@ fn mul_relin() {
     let plainx = encode(&x, scaling_factor, &encoder);
     let plainy = encode(&y, scaling_factor, &encoder);
 
-    let cipherx = encrypt(&key.public(), &ciph_modulus, &plainx);
-    let ciphery = encrypt(&key.public(), &ciph_modulus, &plainy);
+    let cipherx = encrypt(key.public(), &ciph_modulus, &plainx);
+    let ciphery = encrypt(key.public(), &ciph_modulus, &plainy);
 
     let prod = &cipherx * &ciphery;
     let cipherz_relin = prod.relin(&relin_key, &big_modulus);
-    let plainz_relin = decrypt(&key.private(), cipherz_relin);
+    let plainz_relin = decrypt(key.private(), cipherz_relin);
     let z_relin = decode(plainz_relin, &encoder);
 
     let expected_z: Vec<f64> = x.iter().zip(&y).map(|(a, b)| a * b).collect();
@@ -199,8 +199,8 @@ fn mnist() {
         whole
     };
     let plain = encode(&padded_message, scaling_factor, &encoder);
-    let cipher = encrypt(&key.public(), &ciph_modulus, &plain);
-    let out = decrypt(&key.private(), cipher);
+    let cipher = encrypt(key.public(), &ciph_modulus, &plain);
+    let out = decrypt(key.private(), cipher);
     let img = decode(out, &encoder);
 
     let mut img: Vec<u8> = img.iter().map(|x| (x.re * 255.) as u8).collect();
@@ -276,8 +276,8 @@ fn mnist_crt() {
         whole
     };
     let plain = encode(&padded_message, scaling_factor, &encoder);
-    let cipher = encrypt(&key.public(), &ciph_modulus, &plain);
-    let out = decrypt(&key.private(), cipher);
+    let cipher = encrypt(key.public(), &ciph_modulus, &plain);
+    let out = decrypt(key.private(), cipher);
     let img = decode(out, &encoder);
 
     let mut img: Vec<u8> = img.iter().map(|x| (x.re * 255.) as u8).collect();

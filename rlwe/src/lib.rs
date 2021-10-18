@@ -45,11 +45,11 @@ impl<'n> CipherText<'n, BigInt, 3> {
 
         let mut new_c0 = (&relin_key.0 * &self.c[2]) % &(modulus * big_modulus);
         new_c0.coef = new_c0.coef.iter().map(|x| x / big_modulus).collect();
-        new_c0 = (new_c0 + &self.c[0]) % &modulus;
+        new_c0 = (new_c0 + &self.c[0]) % modulus;
 
         let mut new_c1 = (&relin_key.1 * &self.c[2]) % &(modulus * big_modulus);
         new_c1.coef = new_c1.coef.iter().map(|x| x / big_modulus).collect();
-        new_c1 = (new_c1 + &self.c[1]) % &modulus;
+        new_c1 = (new_c1 + &self.c[1]) % modulus;
 
         CipherText {
             c: [new_c0, new_c1].into(),
@@ -143,7 +143,7 @@ impl<'a> Rwle<'a, BigInt> {
         let sk = PrivateKey::rand_binary(poly_degree, size);
 
         // First part of our public key, a
-        let mut a = PolynomialRing::rand_uniform(&modulus, poly_degree, size);
+        let mut a = PolynomialRing::rand_uniform(modulus, poly_degree, size);
         // Flip the sign in calculation of public key
         a.coef = a.coef.iter().map(|x| -x).collect();
 
@@ -192,8 +192,8 @@ impl<'a> Rwle<'a, BigInt> {
     }
 
     pub fn relin_key(&self, big_modulo: &BigInt) -> PublicKey<BigInt> {
-        let sk_squared = (&self.sk * &self.sk) % &big_modulo;
-        self.switch_key(&big_modulo, &sk_squared)
+        let sk_squared = (&self.sk * &self.sk) % big_modulo;
+        self.switch_key(big_modulo, &sk_squared)
     }
 
     pub fn public(&self) -> &PublicKey<BigInt> {
@@ -218,10 +218,10 @@ pub fn encrypt<'n>(
     let u = PolynomialRing::rand_binary(poly_degree, size);
 
     // Encrypt the data with b and add error.
-    let c0 = (((&pk.0 * &u) % &modulus + &e1) % &modulus + &plain.poly) % &modulus;
+    let c0 = (((&pk.0 * &u) % modulus + &e1) % modulus + &plain.poly) % modulus;
 
     // Apply u to pk1 to preserve integrity and add error.
-    let c1 = (&pk.1 * &u + &e2) % &modulus;
+    let c1 = (&pk.1 * &u + &e2) % modulus;
 
     CipherText {
         c: [c0, c1].into(),
@@ -242,7 +242,7 @@ pub fn decrypt<'n, const N: usize>(
     for i in 1..N {
         poly = (poly + &sk_pow * &ct.c[i]) % &modulus;
         // TODO: This does one extra computation at last element. Fix this.
-        sk_pow = (&sk_pow * &sk) % &modulus;
+        sk_pow = (&sk_pow * sk) % &modulus;
     }
 
     let poly = poly % &modulus;

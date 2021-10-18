@@ -164,7 +164,7 @@ fn overflow_add() {
     let c = (a + b) % &q;
 
     assert_eq!(
-        PolynomialRing::new(n, vec![-2.to_bigint().unwrap(), -1.to_bigint().unwrap()]),
+        PolynomialRing::new(n, vec![-(2.to_bigint().unwrap()), -(1.to_bigint().unwrap())]),
         c
     );
 }
@@ -185,9 +185,9 @@ fn overflow_mul() {
         PolynomialRing::new(
             n,
             vec![
-                -6.to_bigint().unwrap(),
+                -(6.to_bigint().unwrap()),
                 1.to_bigint().unwrap(),
-                -6.to_bigint().unwrap()
+                -(6.to_bigint().unwrap())
             ]
         ),
         c

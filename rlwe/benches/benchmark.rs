@@ -60,7 +60,7 @@ fn encoder_benchmark(c: &mut Criterion) {
         let encoder = encoder::CKKSEncoder::new(poly_degree as usize * 2);
         let msg = vec![0f64; poly_degree >> 1];
         group.bench_with_input(BenchmarkId::from_parameter(poly_degree), &msg, |b, m| {
-            b.iter(|| encode(&m, scaling_factor, &encoder));
+            b.iter(|| encode(m, scaling_factor, &encoder));
         });
     }
     group.finish()
@@ -78,7 +78,7 @@ fn encryption_benchmark(c: &mut Criterion) {
         let msg = vec![0f64; poly_degree >> 1];
         let plain = encode(&msg, scaling_factor, &encoder);
         group.bench_with_input(BenchmarkId::from_parameter(poly_degree), &plain, |b, p| {
-            b.iter(|| encrypt(&key.public(), &ciph_modulus, &p));
+            b.iter(|| encrypt(key.public(), &ciph_modulus, p));
         });
     }
     group.finish()
@@ -95,7 +95,7 @@ fn addition_benchmark(c: &mut Criterion) {
         let encoder = encoder::CKKSEncoder::new(poly_degree as usize * 2);
         let msg = vec![0f64; poly_degree >> 1];
         let plain = encode(&msg, scaling_factor, &encoder);
-        let cipher = encrypt(&key.public(), &ciph_modulus, &plain);
+        let cipher = encrypt(key.public(), &ciph_modulus, &plain);
         group.bench_function(BenchmarkId::from_parameter(poly_degree), |b| {
             b.iter(|| &cipher + &cipher)
         });
@@ -117,7 +117,7 @@ fn multiplication_benchmark(c: &mut Criterion) {
         let encoder = encoder::CKKSEncoder::new(poly_degree as usize * 2);
         let msg = vec![0f64; poly_degree >> 1];
         let plain = encode(&msg, scaling_factor, &encoder);
-        let cipher = encrypt(&key.public(), &ciph_modulus, &plain);
+        let cipher = encrypt(key.public(), &ciph_modulus, &plain);
         group.bench_function(BenchmarkId::new("Multiplication", poly_degree), |b| {
             b.iter(|| &cipher * &cipher)
         });

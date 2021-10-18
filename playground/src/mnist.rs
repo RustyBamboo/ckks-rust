@@ -66,8 +66,8 @@ fn main() {
         whole
     };
     let plain = encode(&padded_message, scaling_factor, &encoder);
-    let cipher = encrypt(&key.public(), &ciph_modulus, &plain);
-    let out = decrypt(&key.private(), cipher);
+    let cipher = encrypt(key.public(), &ciph_modulus, &plain);
+    let out = decrypt(key.private(), cipher);
     let img = decode(out, &encoder);
 
     let mut img: Vec<u8> = img.iter().map(|x| (x.re * 255.) as u8).collect();

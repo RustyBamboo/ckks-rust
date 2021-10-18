@@ -71,7 +71,7 @@ impl Crt {
             let i_val = (values[i] * &self.crt_vals_inv[i]) % self.primes[i];
             let i_val = (i_val * &self.crt_vals[i]) % &self.modulus;
             reg += i_val;
-            reg = reg % &self.modulus;
+            reg %= &self.modulus;
         }
         reg
     }

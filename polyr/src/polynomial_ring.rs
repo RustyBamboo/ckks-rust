@@ -17,7 +17,7 @@ pub fn mod_ring(num: &BigInt, q: &BigInt) -> BigInt {
     // This takes the modulus rather than remainder
     let num = ((num % q) + q) % q;
 
-    return if num > q / 2 { num - q } else { num };
+    if num > q / 2 { num - q } else { num }
 }
 
 pub trait Modulo {
@@ -25,7 +25,7 @@ pub trait Modulo {
 }
 impl Modulo for BigInt {
     fn mod_ring(&self, q: &Self) -> Self {
-        return mod_ring(&self, &q);
+        mod_ring(self, q)
     }
 }
 
@@ -155,7 +155,7 @@ impl<'a> PolynomialRing<'a, BigInt> {
         let mut rng = rand::thread_rng();
         let coef = (0..size)
             .map(|_| {
-                rng.gen_bigint_range(&Zero::zero(), &ring)
+                rng.gen_bigint_range(&Zero::zero(), ring)
                     .to_bigint()
                     .unwrap()
             })
@@ -194,7 +194,7 @@ impl<'a> std::ops::Rem<&BigInt> for PolynomialRing<'a, BigInt> {
 impl<'a> std::ops::Rem<&BigInt> for &PolynomialRing<'a, BigInt> {
     type Output = PolynomialRing<'a, BigInt>;
     fn rem(self, other: &BigInt) -> Self::Output {
-        let coef = self.coef.iter().map(|x| x.mod_ring(&other)).collect();
+        let coef = self.coef.iter().map(|x| x.mod_ring(other)).collect();
         PolynomialRing::new(self.poly_degree, coef).add_option_crt(self.crt)
     }
 }
@@ -324,8 +324,8 @@ impl<'a> std::ops::Mul<&PolynomialRing<'a, BigInt>> for &PolynomialRing<'a, BigI
             let b = &other.coef;
 
             let mul_ntt = |ntt: &Ntt| {
-                let a = ntt.fft_fwd(&a);
-                let b = ntt.fft_fwd(&b);
+                let a = ntt.fft_fwd(a);
+                let b = ntt.fft_fwd(b);
                 let c = (0..self.poly_degree).map(|i| &a[i] * &b[i]).collect();
                 let res = ntt
                     .fft_inv(&c)
