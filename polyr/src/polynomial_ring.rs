@@ -46,6 +46,11 @@ where
 }
 
 impl<'a> PolynomialRing<'a, BigInt> {
+    ///
+    /// Create a new polynomial in R/[x^N]
+    ///
+    /// Where poly_degree is N, and coef are the coefficients
+    ///
     pub fn new(poly_degree: usize, coef: Vec<BigInt>) -> Self {
         // Take the mod to make sure elements are in the ring
         Self {
@@ -55,13 +60,31 @@ impl<'a> PolynomialRing<'a, BigInt> {
         }
     }
 
+    ///
+    /// Create a new polynomial but with a context to the Chinese Remainder Theorem
+    ///
     pub fn new_with_crt(poly_degree: usize, coef: Vec<BigInt>, crt: &'a Crt) -> Self {
-        // Take the mod to make sure elements are in the ring
         Self {
             coef,
             poly_degree,
             crt: Some(crt),
         }
+    }
+
+    ///
+    /// Add a Chinese Remainder Theorem context
+    ///
+    pub fn add_crt(mut self, crt: &'a Crt) -> Self {
+        self.crt = Some(crt);
+        self
+    }
+
+    ///
+    /// Add a Chinese Remainder Theorem context as an Option
+    ///
+    pub fn add_option_crt(mut self, crt: Option<&'a Crt>) -> Self {
+        self.crt = crt;
+        self
     }
 
     pub fn len(&self) -> usize {
@@ -72,7 +95,9 @@ impl<'a> PolynomialRing<'a, BigInt> {
         self.len() == 0
     }
 
-    // Remove trailing zeros
+    ///
+    /// Remove trailing zeros of polynomial
+    ///
     pub fn clean(mut self) -> Self {
         let mut count = 0;
         {
@@ -89,7 +114,9 @@ impl<'a> PolynomialRing<'a, BigInt> {
         self
     }
 
-    // Take the function modulo of self with (X^n + 1)
+    ///
+    /// Take the function modulo of self with (X^n + 1)
+    ///
     fn mod_cyc(mut self) -> Self {
         let n = self.poly_degree;
         if self.len() >= n {
@@ -103,6 +130,9 @@ impl<'a> PolynomialRing<'a, BigInt> {
         self
     }
 
+    ///
+    /// Create a random polynomial with samples either 0 or 1.
+    ///
     pub fn rand_binary(poly_degree: usize, size: usize) -> Self {
         let mut rng = rand::thread_rng();
         let u = Uniform::from(0..2);
@@ -116,6 +146,11 @@ impl<'a> PolynomialRing<'a, BigInt> {
         }
     }
 
+    ///
+    /// Create a random polynomial from a uniform distribution of [0, q]
+    ///
+    /// Where q is modulo of the field elements
+    ///
     pub fn rand_uniform(ring: &BigInt, poly_degree: usize, size: usize) -> Self {
         let mut rng = rand::thread_rng();
         let coef = (0..size)
@@ -132,6 +167,9 @@ impl<'a> PolynomialRing<'a, BigInt> {
         }
     }
 
+    ///
+    /// Create a random polynomial with samples from a Gaussian distribution in [0, 2]
+    ///
     pub fn rand_normal(poly_degree: usize, size: usize) -> Self {
         let mut rng = rand::thread_rng();
         let n = Normal::new(0., 2.).expect("Error creating distribution");
@@ -157,7 +195,7 @@ impl<'a> std::ops::Rem<&BigInt> for &PolynomialRing<'a, BigInt> {
     type Output = PolynomialRing<'a, BigInt>;
     fn rem(self, other: &BigInt) -> Self::Output {
         let coef = self.coef.iter().map(|x| x.mod_ring(&other)).collect();
-        PolynomialRing::new(self.poly_degree, coef)
+        PolynomialRing::new(self.poly_degree, coef).add_option_crt(self.crt)
     }
 }
 
@@ -174,7 +212,9 @@ impl<'a> std::ops::Add for PolynomialRing<'a, BigInt> {
                 Right(a) => a.clone(),
             })
             .collect();
-        PolynomialRing::new(self.poly_degree, out).mod_cyc()
+        PolynomialRing::new(self.poly_degree, out)
+            .mod_cyc()
+            .add_option_crt(self.crt)
     }
 }
 
@@ -191,7 +231,9 @@ impl<'a> std::ops::Add<&PolynomialRing<'a, BigInt>> for &PolynomialRing<'a, BigI
                 Right(a) => a.clone(),
             })
             .collect();
-        PolynomialRing::new(self.poly_degree, out).mod_cyc()
+        PolynomialRing::new(self.poly_degree, out)
+            .mod_cyc()
+            .add_option_crt(self.crt)
     }
 }
 
@@ -208,7 +250,9 @@ impl<'a> std::ops::Add<&PolynomialRing<'a, BigInt>> for PolynomialRing<'a, BigIn
                 Right(a) => a.clone(),
             })
             .collect();
-        PolynomialRing::new(self.poly_degree, out).mod_cyc()
+        PolynomialRing::new(self.poly_degree, out)
+            .mod_cyc()
+            .add_option_crt(self.crt)
     }
 }
 
@@ -225,7 +269,9 @@ impl<'a> std::ops::Sub for PolynomialRing<'a, BigInt> {
                 Right(a) => a.clone(),
             })
             .collect();
-        PolynomialRing::new(self.poly_degree, out).mod_cyc()
+        PolynomialRing::new(self.poly_degree, out)
+            .mod_cyc()
+            .add_option_crt(self.crt)
     }
 }
 
@@ -242,7 +288,9 @@ impl<'a> std::ops::Sub<&PolynomialRing<'a, BigInt>> for &PolynomialRing<'a, BigI
                 Right(a) => a.clone(),
             })
             .collect();
-        PolynomialRing::new(self.poly_degree, out).mod_cyc()
+        PolynomialRing::new(self.poly_degree, out)
+            .mod_cyc()
+            .add_option_crt(self.crt)
     }
 }
 
@@ -259,7 +307,9 @@ impl<'a> std::ops::Sub<&PolynomialRing<'a, BigInt>> for PolynomialRing<'a, BigIn
                 Right(a) => a.clone(),
             })
             .collect();
-        PolynomialRing::new(self.poly_degree, out).mod_cyc()
+        PolynomialRing::new(self.poly_degree, out)
+            .mod_cyc()
+            .add_option_crt(self.crt)
     }
 }
 
@@ -282,7 +332,9 @@ impl<'a> std::ops::Mul<&PolynomialRing<'a, BigInt>> for &PolynomialRing<'a, BigI
                     .iter()
                     .map(|x| x.to_bigint().unwrap())
                     .collect();
-                return PolynomialRing::new(self.poly_degree, res).mod_cyc();
+                return PolynomialRing::new(self.poly_degree, res)
+                    .mod_cyc()
+                    .add_option_crt(self.crt);
             };
 
             let prod: Vec<PolynomialRing<_>> = crt.ntts.iter().map(|n| mul_ntt(n)).collect();
@@ -296,7 +348,9 @@ impl<'a> std::ops::Mul<&PolynomialRing<'a, BigInt>> for &PolynomialRing<'a, BigI
                 })
                 .collect();
 
-            return PolynomialRing::new(self.poly_degree, final_coeffs).mod_cyc();
+            return PolynomialRing::new(self.poly_degree, final_coeffs)
+                .mod_cyc()
+                .add_option_crt(self.crt);
         }
         let mut res = vec![Zero::zero(); other.len() + self.len() - 1];
         for ((i1, v1), (i2, v2)) in
@@ -304,7 +358,9 @@ impl<'a> std::ops::Mul<&PolynomialRing<'a, BigInt>> for &PolynomialRing<'a, BigI
         {
             res[i1 + i2] += v1 * v2;
         }
-        PolynomialRing::new(self.poly_degree, res).mod_cyc()
+        PolynomialRing::new(self.poly_degree, res)
+            .mod_cyc()
+            .add_option_crt(self.crt)
     }
 }
 

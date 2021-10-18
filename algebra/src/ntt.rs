@@ -21,7 +21,7 @@ impl Ntt {
         );
 
         let root_of_unity = root_of_unity(2 * degree as i128, coeff_modulus as i128);
-        let root_of_unity_inv = invmod(root_of_unity, coeff_modulus as i128);
+        let root_of_unity_inv = invmod(&root_of_unity, coeff_modulus as i128);
 
         let mut roots_of_unity = vec![One::one(); degree as usize];
         let mut roots_of_unity_inv = vec![One::one(); degree as usize];
@@ -100,7 +100,7 @@ impl Ntt {
         );
 
         let to_scale_down = self.ntt(coeffs, &self.roots_of_unity_inv);
-        let poly_degree_inv = invmod(self.degree as i128, self.coeff_modulus as i128);
+        let poly_degree_inv = invmod(&(self.degree as i128), self.coeff_modulus as i128);
 
         (0..num_coeffs)
             .map(|i| {

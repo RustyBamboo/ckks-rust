@@ -3,7 +3,11 @@ members = [
     "polyr",
     "rlwe",
     "algebra",
+    "playground",
 ]
 
 [profile.bench]
+debug = true
+
+[profile.release]
 debug = true

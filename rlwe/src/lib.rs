@@ -11,6 +11,8 @@ use num_rational::Ratio;
 use num_traits::cast::ToPrimitive;
 use num_traits::Zero;
 
+use algebra::crt::Crt;
+
 use arrayvec::ArrayVec;
 
 // b & a from equation a * s + e = b where a,s,e are randomly generated
@@ -127,7 +129,15 @@ pub struct Rwle<'n, T> {
     pk: PublicKey<'n, T>,
 }
 
-impl Rwle<'_, BigInt> {
+impl<'a> Rwle<'a, BigInt> {
+    pub fn add_crt(mut self, crt: &'a Crt) -> Self {
+        let sk = self.sk.add_crt(crt);
+        let pk = PublicKey(self.pk.0.add_crt(crt), self.pk.1.add_crt(crt));
+        self.sk = sk;
+        self.pk = pk;
+        self
+    }
+
     pub fn keygen(modulus: &BigInt, poly_degree: usize, size: usize) -> Self {
         // Our secret key
         let sk = PrivateKey::rand_binary(poly_degree, size);

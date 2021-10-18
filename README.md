@@ -42,6 +42,13 @@ or for a specific benchmark:
 cargo flamegraph --bench benchmark  -- multiplication/Multiplication/4096 --bench
 ```
 
+or for a specific test:
+```
+cd rlwe
+cargo flamegraph --test test --dev -- mnist
+```
+
+
 Then look at the flamegraph:
 ```
 firefox flamegraph.svg

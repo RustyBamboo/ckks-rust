@@ -7,4 +7,6 @@
 **.pdf
 **.out
 **.toc
-**pdf_tex
+**.pdf_tex
+**.data
+flamegraph.svg

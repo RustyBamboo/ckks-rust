@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
-use num_traits::{One, PrimInt, Zero};
-use std::ops::{Add, AddAssign, BitAnd, DivAssign, Rem, ShrAssign, SubAssign};
+use num_traits::{One, PrimInt, RefNum, Zero};
+use std::ops::{Add, AddAssign, BitAnd, DivAssign, Mul, Rem, ShrAssign, SubAssign};
 
 ///
 /// Mimic the behavior of std::ops::RemEuclid but for other types, such as BigInt
@@ -46,20 +46,32 @@ pub fn bit_reverse_vec<T: Clone>(values: &Vec<T>) -> Vec<T> {
 ///
 /// Find a^b % p
 ///
-pub fn powmod<T>(mut a: T, mut b: T, p: T) -> T
+pub fn powmod<T, S>(mut a: T, mut b: S, p: S) -> T
 where
-    T: PrimInt + One + Zero + SubAssign + ShrAssign + BitAnd<T, Output = T> + PartialEq,
+    for<'a> &'a T: RefNum<T>,
+    for<'a> T: Mul<&'a T, Output = T>,
+    T: One
+        + Zero
+        + SubAssign
+        + ShrAssign<S>
+        + BitAnd<T, Output = T>
+        + PartialEq
+        + Rem<S, Output = T>,
+    S: PrimInt + SubAssign + ShrAssign,
 {
-    let _0 = T::zero();
-    let _1 = T::one();
-    let mut res = _1;
-    while b != _0 {
-        if (b & _1) != _0 {
-            res = res * a % p;
-            b -= _1;
+    let _0t = T::zero();
+    let _1t = T::one();
+
+    let _0s = S::zero();
+    let _1s = S::one();
+    let mut res = _1t;
+    while b != _0s {
+        if (b & _1s) != _0s {
+            res = res * &a % p;
+            b -= _1s;
         } else {
-            a = a * a % p;
-            b >>= _1;
+            a = &a * &a % p;
+            b >>= _1s;
         }
     }
     res
@@ -79,13 +91,23 @@ fn powmod_test() {
 ///
 /// Find the inverse in a given modulus
 ///
-pub fn invmod<T>(a: T, p: T) -> T
+pub fn invmod<T, S>(a: &T, p: S) -> T
 where
-    T: PrimInt + One + Zero + SubAssign + ShrAssign + BitAnd<T, Output = T>,
+    for<'a> &'a T: RefNum<T>,
+    for<'a> T: Mul<&'a T, Output = T>,
+    T: One
+        + Zero
+        + SubAssign
+        + ShrAssign<S>
+        + BitAnd<T, Output = T>
+        + Rem<S, Output = T>
+        + PartialEq
+        + Clone,
+    S: PrimInt + SubAssign + ShrAssign,
 {
-    let _1 = T::one();
+    let _1 = S::one();
     let _2 = _1 + _1;
-    powmod(a, p - _2, p)
+    powmod(a.clone(), p - _2, p)
 }
 
 ///
@@ -95,6 +117,8 @@ where
 ///
 pub fn generator<T>(p: T) -> Option<T>
 where
+    for<'a> &'a T: RefNum<T>,
+    for<'a> T: Mul<&'a T, Output = T>,
     T: PrimInt
         + Zero
         + One
@@ -170,6 +194,8 @@ fn generator_test() {
 ///
 pub fn root_of_unity<T>(order: T, modulus: T) -> T
 where
+    for<'a> &'a T: RefNum<T>,
+    for<'a> T: Mul<&'a T, Output = T>,
     T: PrimInt
         + Zero
         + One

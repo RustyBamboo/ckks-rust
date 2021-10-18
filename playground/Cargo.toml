@@ -1,0 +1,16 @@
+[package]
+name = "playground"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+algebra = { path = "../algebra/" }
+rlwe = { path = "../rlwe/" }
+num-bigint = "0.4.2"
+num-traits = "0.2.14" 
+
+[[bin]]
+name = "mnist"
+path = "src/mnist.rs"

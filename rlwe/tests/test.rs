@@ -3,6 +3,8 @@ use approx::assert_relative_eq;
 use num_bigint::ToBigInt;
 use rlwe::*;
 
+use algebra::crt::Crt;
+
 #[test]
 fn encoder() {
     let n = 8;
@@ -187,6 +189,83 @@ fn mnist() {
     let scaling_factor = 1_usize << 30;
 
     let key = Rwle::keygen(&ciph_modulus, poly_degree as usize, poly_degree as usize);
+    let encoder = encoder::CKKSEncoder::new(poly_degree as usize * 2);
+
+    let padded_message: [f64; 1024] = {
+        let mut whole: [f64; 1024] = [0.; 1024];
+        let (one, two) = whole.split_at_mut(28 * 28);
+        one.copy_from_slice(&four_img_f64);
+        two.copy_from_slice(&[0.; 240]);
+        whole
+    };
+    let plain = encode(&padded_message, scaling_factor, &encoder);
+    let cipher = encrypt(&key.public(), &ciph_modulus, &plain);
+    let out = decrypt(&key.private(), cipher);
+    let img = decode(out, &encoder);
+
+    let mut img: Vec<u8> = img.iter().map(|x| (x.re * 255.) as u8).collect();
+    img.truncate(28 * 28);
+
+    // Check if the decoded image is within +-1 pixel value of original image
+    for i in 0..28 * 28 {
+        assert!((four_img[i] as i32 - img[i] as i32).abs() <= 1);
+    }
+}
+
+#[test]
+fn mnist_crt() {
+    let four_img: [u8; 28 * 28] = [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 67, 232, 39, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 81, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 120, 180, 39, 0, 0, 0, 0, 0, 0, 0, 0, 0, 126, 163, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 153, 210, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 220, 163, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 254, 162, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 222, 163, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 183, 254, 125, 0, 0, 0, 0, 0, 0, 0, 0, 0, 46, 245, 163,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 198, 254, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 120, 254,
+        163, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 231, 254, 29, 0, 0, 0, 0, 0, 0, 0, 0, 0, 159,
+        254, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 163, 254, 216, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        159, 254, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 86, 178, 248, 254, 91, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 159, 254, 85, 0, 0, 0, 47, 49, 116, 144, 150, 241, 243, 234, 179, 241, 252, 40, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 150, 253, 237, 207, 207, 207, 253, 254, 250, 240, 198, 143, 91, 28,
+        5, 233, 250, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 119, 177, 177, 177, 177, 177, 98, 56, 0,
+        0, 0, 0, 0, 102, 254, 220, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 169, 254, 137, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 169, 254, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 169, 254, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 169, 255, 94, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 169, 254, 96, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        169, 254, 153, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        169, 255, 153, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        96, 254, 153, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0,
+    ];
+
+    let mut four_img_f64 = [0f64; 28 * 28];
+
+    for i in 0..28 * 28 {
+        four_img_f64[i] = four_img[i] as f64 / 255f64;
+    }
+
+    let log_poly_degree = 11;
+    let poly_degree = 1 << log_poly_degree;
+
+    let log_modulus = 600;
+    let ciph_modulus = 1.to_bigint().unwrap() << log_modulus;
+
+    let prime_size = 30;
+
+    let num_primes = (2 + log_poly_degree + 4 * log_modulus + prime_size - 1) / prime_size;
+    let crt = Crt::new(num_primes, prime_size, poly_degree);
+
+    let scaling_factor = 1_usize << 30;
+
+    let key = Rwle::keygen(&ciph_modulus, poly_degree as usize, poly_degree as usize).add_crt(&crt);
     let encoder = encoder::CKKSEncoder::new(poly_degree as usize * 2);
 
     let padded_message: [f64; 1024] = {
